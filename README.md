@@ -82,7 +82,7 @@ No data is collected without explicit consent.
 
 ---
 
-## 📬 Contact
+##  Contact
 
 Project developed by [@lein5in](https://github.com/lein5in)  
 Ideas, feedback, collaborations — always welcome.
