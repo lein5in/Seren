@@ -1,0 +1,2 @@
+# Seren
+Ai Student Planner
