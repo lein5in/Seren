@@ -2,6 +2,7 @@
 # Python / Backend
 # ========================
 backend/venv/
+backend/seren.db
 __pycache__/
 *.pyc
 *.pyo
@@ -10,6 +11,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
 
 # ========================
 # React / Frontend
