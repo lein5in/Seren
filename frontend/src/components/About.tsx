@@ -21,16 +21,16 @@ export default function About() {
 
   const paragraphs = [
     {
-      en: "I'm a university student who struggles with anxiety. Every time a new deadline appeared out of nowhere, I'd lose my momentum completely. I'd feel lost, frozen, unable to start.",
-      fr: "Je suis un étudiant universitaire qui lutte contre l'anxiété. Chaque fois qu'une nouvelle deadline apparaissait de nulle part, je perdais complètement mon élan. Je me sentais perdu, figé, incapable de commencer.",
+      en: "I'm a university student who juggles courses, assignments, and deadlines across a dozen different platforms. Every semester I'd start organized and end up lost — tabs everywhere, notes scattered, no idea where to begin.",
+      fr: "Je suis un étudiant universitaire qui jongle entre les cours, les devoirs et les deadlines sur une dizaine de plateformes différentes. Chaque semestre je commençais organisé et finissais perdu — des onglets partout, des notes éparpillées, sans savoir par où commencer.",
     },
     {
-      en: "I tried every productivity app out there. They were all cold, rigid, and built for people who don't struggle the way I do.",
-      fr: "J'ai essayé toutes les applications de productivité. Elles étaient toutes froides, rigides, et faites pour des gens qui ne luttent pas comme moi.",
+      en: "I tried every study app out there. They were all cold, rigid, and built for people who are already organized. None of them actually knew my courses, my notes, or my schedule.",
+      fr: "J'ai essayé toutes les apps d'études. Elles étaient toutes froides, rigides, et faites pour des gens déjà organisés. Aucune ne connaissait vraiment mes cours, mes notes ou mon horaire.",
     },
     {
-      en: "So I built Seren — the companion I wish I had. It doesn't bark orders at you, it asks how you're doing first. It doesn't overwhelm you with tasks, it shows you just what you need to see. It's calm because you deserve calm.",
-      fr: "Alors j'ai créé Seren — le compagnon que j'aurais voulu avoir. Il ne vous aboie pas dessus, il demande d'abord comment vous allez. Il ne vous submerge pas de tâches, il vous montre juste ce que vous devez voir. Il est calme parce que vous méritez le calme.",
+      en: "So I built Seren — the companion I wish I had. It lives in your browser, knows your material, and is ready every time you sit down to work. You don't manage it. It studies with you.",
+      fr: "Alors j'ai créé Seren — le compagnon que j'aurais voulu avoir. Il vit dans votre navigateur, connaît votre matière, et est prêt chaque fois que vous vous installez pour travailler. Vous ne le gérez pas. Il étudie avec vous.",
     },
   ]
 
@@ -70,8 +70,8 @@ export default function About() {
           <div className="mt-8 border-l-4 border-[#1D9E75] pl-5 py-1">
             <p className="text-[15px] text-[#0F6E56] font-medium leading-relaxed">
               {t(
-                'Seren is calm because you deserve calm.',
-                'Seren est calme parce que vous méritez le calme.'
+                'You don\'t manage Seren. Seren studies with you.',
+                'Vous ne gérez pas Seren. Seren étudie avec vous.'
               )}
             </p>
           </div>

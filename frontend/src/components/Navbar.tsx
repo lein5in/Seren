@@ -42,7 +42,6 @@ export default function Navbar() {
 
       {/* Right side */}
       <div className="flex items-center gap-4">
-        {/* Lang toggle */}
         <div className="flex bg-[#E1F5EE] rounded-full p-[3px] gap-[2px]">
           {(['en', 'fr'] as const).map(l => (
             <button
@@ -59,9 +58,8 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* CTA */}
         <button className="bg-[#0F6E56] text-white text-sm px-5 py-2 rounded-full border-none cursor-pointer font-body hover:bg-[#085041] hover:-translate-y-px transition-all duration-200">
-          {t('Get started', 'Commencer')}
+          {t('Add to Chrome', 'Ajouter à Chrome')}
         </button>
       </div>
     </nav>

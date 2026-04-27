@@ -22,23 +22,23 @@ export default function WhySeren() {
   const stats = [
     {
       num: '73%',
-      en: 'of students report feeling overwhelmed by academic deadlines',
-      fr: 'des étudiants se sentent dépassés par les deadlines académiques',
+      en: 'of students switch between 3+ apps just to manage their courses',
+      fr: 'des étudiants utilisent 3+ apps juste pour gérer leurs cours',
     },
     {
       num: '3×',
-      en: 'more likely to complete tasks when reminded 3 days in advance',
-      fr: 'plus de chances de compléter une tâche avec un rappel 3 jours à l\'avance',
+      en: 'more likely to retain material when tested with personalized quizzes',
+      fr: 'plus de rétention avec des quiz personnalisés depuis ses propres notes',
     },
     {
       num: '5 min',
-      en: 'average setup time — from zero to fully organized',
-      fr: 'temps moyen d\'installation — de zéro à complètement organisé',
+      en: 'average setup time — from zero to fully ready to study',
+      fr: 'temps moyen d\'installation — de zéro à prêt à étudier',
     },
     {
       num: '∞',
-      en: 'works year-round — semester, internship, or vacation',
-      fr: 'fonctionne toute l\'année — semestre, stage ou vacances',
+      en: 'works for any university, any program, anywhere in the world',
+      fr: 'fonctionne pour toute université, tout programme, partout dans le monde',
     },
   ]
 
@@ -54,7 +54,7 @@ export default function WhySeren() {
       <div className="reveal opacity-0 translate-y-8 transition-all duration-700 delay-100">
         <h2 className="font-display text-[clamp(32px,4vw,52px)] leading-[1.15] text-[#085041] mb-16">
           {t('Built for the student', 'Conçu pour l\'étudiant')}<br />
-          {t('who ', 'qui ')}<em className="italic text-[#1D9E75]">{t('feels everything.', 'ressent tout.')}</em>
+          {t('who ', 'qui ')}<em className="italic text-[#1D9E75]">{t('actually studies.', 'étudie vraiment.')}</em>
         </h2>
       </div>
 
@@ -79,8 +79,8 @@ export default function WhySeren() {
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 delay-200 bg-[#085041] rounded-2xl p-10">
           <p className="font-display text-[22px] italic leading-relaxed text-[#9FE1CB] mb-6">
             {t(
-              '"Most productivity tools are built for people who are already organized. Seren is built for the rest of us."',
-              '"La plupart des outils de productivité sont faits pour ceux qui sont déjà organisés. Seren est fait pour les autres."'
+              '"Most study tools make you manage the tool. Seren just studies with you."',
+              '"La plupart des outils d\'étude te font gérer l\'outil. Seren, lui, étudie avec toi."'
             )}
           </p>
           <p className="text-sm text-[#5DCAA5]">

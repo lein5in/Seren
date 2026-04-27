@@ -9,34 +9,34 @@ interface Feature {
 
 const features: Feature[] = [
   {
-    icon: '🌿',
-    en: { title: 'Caring onboarding', desc: 'Before building your schedule, Seren asks about your availability, priorities, and anxiety level. It adapts to you — not the other way around.' },
-    fr: { title: 'Onboarding bienveillant', desc: 'Avant de construire votre planning, Seren demande vos disponibilités, priorités et niveau d\'anxiété. Il s\'adapte à vous — pas l\'inverse.' },
+    icon: '💬',
+    en: { title: 'Smart study chat', desc: 'Ask Seren anything about your courses, notes, or deadlines. It knows your material and answers in context — like a tutor who never gets tired.' },
+    fr: { title: 'Chat de révision intelligent', desc: 'Posez n\'importe quelle question sur vos cours, notes ou deadlines. Seren connaît votre matière et répond en contexte.' },
+  },
+  {
+    icon: '🖱️',
+    en: { title: 'Right-click to learn', desc: 'Select any text on any page, right-click, and choose "Solve with Seren". A focused window opens instantly with your answer — no tab switching.' },
+    fr: { title: 'Clic droit pour apprendre', desc: 'Sélectionnez n\'importe quel texte, clic droit, choisissez "Résoudre avec Seren". Une fenêtre s\'ouvre instantanément avec votre réponse.' },
   },
   {
     icon: '📅',
-    en: { title: 'Smart scheduling', desc: 'Import your university timetable via .ics from uOzone. Seren auto-detects deadlines, exams, and assignments — then prioritizes them calmly.' },
+    en: { title: 'Smart scheduling', desc: 'Import your university timetable via .ics from uOzone or any portal. Seren auto-detects deadlines, exams, and assignments — then prioritizes them calmly.' },
     fr: { title: 'Planning intelligent', desc: 'Importez votre horaire via .ics depuis uOzone. Seren détecte automatiquement les deadlines et les priorise calmement.' },
   },
   {
-    icon: '🔔',
-    en: { title: 'Early reminders', desc: 'Get reminded 3 days before every deadline — never be caught off guard again. Reminders are calm, not alarming.' },
-    fr: { title: 'Rappels anticipés', desc: 'Recevez des rappels 3 jours avant chaque deadline. Les rappels sont calmes, pas alarmants.' },
+    icon: '🧠',
+    en: { title: 'Academic memory', desc: 'Upload your PDFs, slides, and notes. Seren reads them and remembers everything across every session — your knowledge base, always at hand.' },
+    fr: { title: 'Mémoire académique', desc: 'Importez vos PDFs, slides et notes. Seren les lit et s\'en souvient dans chaque session — votre base de connaissances, toujours disponible.' },
   },
   {
-    icon: '😌',
-    en: { title: 'Daily check-ins', desc: 'Every morning, Seren asks how you feel. Overwhelmed? It simplifies your day. Energized? It challenges you gently.' },
-    fr: { title: 'Check-ins quotidiens', desc: 'Chaque matin, Seren demande comment vous vous sentez. Submergé ? Il simplifie votre journée. Energisé ? Il vous challenge doucement.' },
+    icon: '🎯',
+    en: { title: 'Generative quizzes', desc: 'Seren generates quizzes directly from your own notes. Study smarter, not longer — test yourself on exactly what matters.' },
+    fr: { title: 'Quiz génératifs', desc: 'Seren génère des quiz directement depuis vos propres notes. Étudiez plus intelligemment — testez-vous sur ce qui compte vraiment.' },
   },
   {
     icon: '🆘',
     en: { title: 'Overwhelm mode', desc: 'Feeling overwhelmed? One button. Seren shows you just ONE task to do right now — nothing else. Breathe. Focus. Move forward.' },
     fr: { title: 'Mode submersion', desc: 'Vous sentez débordé ? Un bouton. Seren vous montre UNE seule tâche à faire maintenant. Respirez. Concentrez-vous.' },
-  },
-  {
-    icon: '💰',
-    en: { title: 'Budget planner', desc: 'Track your student budget alongside your schedule. Seren knows when stressful weeks are coming — and adjusts your financial nudges accordingly.' },
-    fr: { title: 'Planificateur budgétaire', desc: 'Suivez votre budget étudiant en parallèle de votre planning. Seren sait quand les semaines stressantes arrivent.' },
   },
 ]
 
@@ -72,8 +72,8 @@ export default function Features() {
       <div className="reveal opacity-0 translate-y-8 transition-all duration-700 delay-200">
         <p className="text-[17px] text-[#88877F] leading-relaxed font-light max-w-[600px] mb-16">
           {t(
-            'Seren is built around one philosophy: ask before planning. Every feature is designed to reduce friction, not add it.',
-            'Seren est construit autour d\'une philosophie : demander avant de planifier. Chaque fonctionnalité est conçue pour réduire la friction, pas l\'augmenter.'
+            'Seren lives in your browser and knows your courses. Every feature is designed to help you study — not manage an app.',
+            'Seren vit dans votre navigateur et connaît vos cours. Chaque fonctionnalité est conçue pour vous aider à étudier — pas à gérer une app.'
           )}
         </p>
       </div>

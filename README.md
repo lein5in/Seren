@@ -1,49 +1,52 @@
-#  Seren
-> *A calm and intelligent companion for anxious students.*
+# Seren
+> *Your daily study companion — knows your courses, revises with you, remembers everything.*
 
-Seren is a Progressive Web App (PWA) that helps students manage deadlines and mental load — without the surprises that trigger anxiety. Before planning anything, Seren *listens* first.
+Seren is a Chrome extension that lives where you study. Select any text on any page, right-click, and Seren is already there — ready to explain, quiz you, or build your schedule. Powered by Claude on the cloud, zero load on your machine.
 
 ---
 
-##  Features
+## Features
 
-- **Caring onboarding** — Seren asks about your availability and priorities before building any schedule
-- **Smart schedule import** — Import your university timetable via `.ics` from uOzone
+- **Smart study chat** — Ask Seren anything about your courses, notes, or deadlines
+- **Context-aware actions** — Select text on any page → right-click → "Solve with Seren", "Summarize", "Quiz me on this"
+- **Schedule import** — Select your timetable on uOzone or any university portal → Seren structures it instantly
 - **Early reminders** — Get reminded 3 days before every deadline, calmly
 - **Overwhelm mode** — Feeling overwhelmed? One task at a time, nothing else
-- **Daily check-ins** — Seren adapts to how you feel each day
+- **Academic memory** — Upload your PDFs and notes, Seren remembers them across every session
+- **Focus sessions** — Launch a session, stay anchored, log what you accomplished
 
 ---
 
-##  Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
+| Extension | Chrome (Manifest V3) · JavaScript |
 | Frontend | React + TypeScript + Tailwind CSS |
-| Backend | Python + FastAPI |
+| Backend | Python + FastAPI · fully cloud-hosted |
 | Database | SQLite (dev) → PostgreSQL (prod) |
-| AI | Claude API (Anthropic) |
+| AI | Claude API — Sonnet 4.6 (standard) · Opus (complex) |
 | Auth | JWT |
 
 ---
 
-##  Preview
+## Preview
 
 <!-- Add screenshots here -->
 
 ---
 
-##  Ethics & Privacy
+## Ethics & Privacy
 
 Seren never bypasses university authentication. All data access is voluntary:
 - `.ics` export manually provided by the user
-- Browser extension reads only pages already open by the user
+- Extension reads only content explicitly selected by the user
 
 No data collected without explicit consent.
 
 ---
 
-##  Contact
+## Contact
 
 Built by [@lein5in](https://github.com/lein5in) · University of Ottawa  
 Feedback and collaborations always welcome.

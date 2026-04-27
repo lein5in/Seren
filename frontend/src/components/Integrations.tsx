@@ -9,10 +9,10 @@ interface Integration {
 }
 
 const integrations: Integration[] = [
-  { icon: '📆', name: 'uOzone',          en: '.ics schedule import',       fr: 'Import d\'horaire .ics' },
-  { icon: '📚', name: 'Brightspace',     en: 'Auto-read via extension',    fr: 'Lecture auto via extension' },
-  { icon: '📅', name: 'Google Calendar', en: 'Two-way sync',               fr: 'Synchronisation bidirectionnelle' },
-  { icon: '📝', name: 'Notion',          en: 'Export your schedule',       fr: 'Exportez votre planning' },
+  { icon: '🌐', name: 'Chrome Extension',  en: 'Lives in your browser',        fr: 'Vit dans votre navigateur' },
+  { icon: '📆', name: 'Any University',    en: '.ics schedule import',          fr: 'Import d\'horaire .ics' },
+  { icon: '📚', name: 'Brightspace',       en: 'Auto-read via extension',       fr: 'Lecture auto via extension' },
+  { icon: '📅', name: 'Google Calendar',   en: 'Two-way sync',                  fr: 'Synchronisation bidirectionnelle' },
 ]
 
 export default function Integrations() {
@@ -36,7 +36,6 @@ export default function Integrations() {
   return (
     <section id="integrations" className="py-24 px-[5%] bg-[#F8F8F6]" ref={sectionRef}>
 
-      {/* Header */}
       <div className="reveal opacity-0 translate-y-8 transition-all duration-700">
         <p className="text-xs tracking-[3px] text-[#1D9E75] font-medium mb-4 uppercase">
           {t('INTEGRATIONS', 'INTÉGRATIONS')}
@@ -49,7 +48,6 @@ export default function Integrations() {
         </h2>
       </div>
 
-      {/* Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {integrations.map((item, i) => (
           <div
@@ -64,7 +62,6 @@ export default function Integrations() {
         ))}
       </div>
 
-      {/* Coming soon note */}
       <div className="reveal opacity-0 translate-y-8 transition-all duration-700 delay-300 mt-10 text-center">
         <p className="text-sm text-[#88877F]">
           {t('More integrations coming soon · ', 'Plus d\'intégrations bientôt · ')}

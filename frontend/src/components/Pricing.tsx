@@ -16,23 +16,23 @@ const plans: Plan[] = [
     en: {
       plan: 'FREE',
       period: 'forever',
-      cta: 'Get started free',
+      cta: 'Add to Chrome — free',
       features: [
         'Schedule import (.ics)',
         'Basic reminders (3 days)',
-        'Calm onboarding',
         'Up to 20 AI messages/day',
+        'Right-click context menu',
       ],
     },
     fr: {
       plan: 'GRATUIT',
       period: 'pour toujours',
-      cta: 'Commencer gratuitement',
+      cta: 'Ajouter à Chrome — gratuit',
       features: [
         'Import d\'horaire (.ics)',
         'Rappels de base (3 jours)',
-        'Onboarding bienveillant',
         'Jusqu\'à 20 messages IA/jour',
+        'Menu clic droit contextuel',
       ],
     },
   },
@@ -47,10 +47,11 @@ const plans: Plan[] = [
       features: [
         'Everything in Free',
         'Unlimited AI messages',
-        'Daily emotional check-ins',
+        'PDF & notes upload',
+        'Academic memory',
+        'Generative quizzes',
+        'Focus sessions',
         'Overwhelm mode',
-        'Brightspace extension',
-        'Pattern analysis',
       ],
     },
     fr: {
@@ -60,10 +61,11 @@ const plans: Plan[] = [
       features: [
         'Tout du plan Gratuit',
         'Messages IA illimités',
-        'Check-ins émotionnels quotidiens',
+        'Upload PDF et notes',
+        'Mémoire académique',
+        'Quiz génératifs',
+        'Sessions focus',
         'Mode submersion',
-        'Extension Brightspace',
-        'Analyse de patterns',
       ],
     },
   },
@@ -76,9 +78,9 @@ const plans: Plan[] = [
       cta: 'Get Pro',
       features: [
         'Everything in Student',
-        'Budget planner',
         'Google Calendar sync',
         'Notion integration',
+        'Opus model for complex tasks',
         'Priority support',
       ],
     },
@@ -88,9 +90,9 @@ const plans: Plan[] = [
       cta: 'Obtenir Pro',
       features: [
         'Tout du plan Étudiant',
-        'Planificateur budgétaire',
         'Sync Google Calendar',
         'Intégration Notion',
+        'Modèle Opus pour tâches complexes',
         'Support prioritaire',
       ],
     },
@@ -118,7 +120,6 @@ export default function Pricing() {
   return (
     <section id="pricing" className="py-24 px-[5%]" ref={sectionRef}>
 
-      {/* Header */}
       <div className="reveal opacity-0 translate-y-8 transition-all duration-700">
         <p className="text-xs tracking-[3px] text-[#1D9E75] font-medium mb-4 uppercase">
           {t('PRICING', 'TARIFS')}
@@ -131,7 +132,6 @@ export default function Pricing() {
         </h2>
       </div>
 
-      {/* Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
         {plans.map((plan, i) => {
           const data = lang === 'en' ? plan.en : plan.fr
@@ -145,7 +145,6 @@ export default function Pricing() {
                 }`}
               style={{ transitionDelay: `${i * 100}ms` }}
             >
-              {/* Badge */}
               {plan.featured && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#5DCAA5] text-[#04342C] text-[11px] font-medium px-4 py-1 rounded-full tracking-wide whitespace-nowrap">
                   {t('MOST POPULAR', 'PLUS POPULAIRE')}

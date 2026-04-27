@@ -10,23 +10,23 @@ interface Step {
 const steps: Step[] = [
   {
     num: '1',
-    en: { title: 'Create your account', desc: 'Sign up in 30 seconds. No credit card required for the free plan.' },
-    fr: { title: 'Créez votre compte', desc: 'Inscrivez-vous en 30 secondes. Aucune carte requise pour le plan gratuit.' },
+    en: { title: 'Install the extension', desc: 'Add Seren to Chrome in one click. The icon appears instantly in your browser bar — no setup, no configuration.' },
+    fr: { title: 'Installez l\'extension', desc: 'Ajoutez Seren à Chrome en un clic. L\'icône apparaît instantanément dans votre barre — aucune configuration.' },
   },
   {
     num: '2',
-    en: { title: 'Seren gets to know you', desc: 'Answer a few calm questions about your schedule, priorities and how you work best.' },
-    fr: { title: 'Seren apprend à vous connaître', desc: 'Répondez à quelques questions calmes sur votre emploi du temps et priorités.' },
+    en: { title: 'Tell Seren your courses', desc: 'Import your .ics from uOzone, upload your notes and PDFs, or just type your schedule manually. Any university works.' },
+    fr: { title: 'Partagez vos cours avec Seren', desc: 'Importez votre .ics depuis uOzone, ajoutez vos notes et PDFs, ou saisissez votre horaire manuellement. Toute université fonctionne.' },
   },
   {
     num: '3',
-    en: { title: 'Import your schedule', desc: 'Export your .ics from uOzone and drop it in. Seren handles the rest automatically.' },
-    fr: { title: 'Importez votre horaire', desc: 'Exportez votre .ics depuis uOzone et déposez-le. Seren s\'occupe du reste.' },
+    en: { title: 'Open it when you sit down', desc: 'Click the icon, hit "Start Studying". Seren knows where you left off and what\'s coming up — ready before you are.' },
+    fr: { title: 'Ouvrez-le quand vous vous installez', desc: 'Cliquez sur l\'icône, appuyez sur "Commencer à étudier". Seren sait où vous en étiez et ce qui s\'en vient.' },
   },
   {
     num: '4',
-    en: { title: 'Stay calm & focused', desc: 'Seren reminds, adjusts, and cheers you on — every single day, at your pace.' },
-    fr: { title: 'Restez calme et concentré', desc: 'Seren vous rappelle, s\'ajuste et vous encourage — chaque jour, à votre rythme.' },
+    en: { title: 'Select, right-click, learn', desc: 'Highlight anything on any page — an exercise, a concept, a paragraph. Right-click and Seren is already there with an answer.' },
+    fr: { title: 'Sélectionnez, clic droit, apprenez', desc: 'Surlignez n\'importe quoi sur n\'importe quelle page. Clic droit et Seren est déjà là avec une réponse.' },
   },
 ]
 
@@ -66,8 +66,8 @@ export default function HowItWorks() {
       <div className="reveal opacity-0 translate-y-8 transition-all duration-700 delay-200">
         <p className="text-[17px] text-white/60 leading-relaxed font-light max-w-[600px] mb-16">
           {t(
-            'Getting started with Seren takes less than 5 minutes. No complicated setup, no overwhelming options.',
-            'Démarrer avec Seren prend moins de 5 minutes. Pas de configuration compliquée, pas d\'options écrasantes.'
+            'Install once, open every time you study. Seren is ready before you are.',
+            'Installez une fois, ouvrez à chaque session d\'étude. Seren est prêt avant vous.'
           )}
         </p>
       </div>
