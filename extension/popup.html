@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seren</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+        <path d="M16 2 A14 14 0 1 1 26.1 22" stroke="#0F6E56" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="26.5" cy="23.5" r="2.5" fill="#1D9E75"/>
+        <line x1="10" y1="13" x2="22" y2="13" stroke="#1D9E75" stroke-width="1.8" stroke-linecap="round" opacity="0.8"/>
+        <line x1="9" y1="18" x2="23" y2="18" stroke="#1D9E75" stroke-width="1.8" stroke-linecap="round" opacity="0.5"/>
+        <line x1="10" y1="23" x2="22" y2="23" stroke="#1D9E75" stroke-width="1.8" stroke-linecap="round" opacity="0.3"/>
+      </svg>
+      <span class="header-title">Seren</span>
+    </div>
+    <div class="header-right">
+      <button class="icon-btn" id="btn-focus" title="Start focus session">🎯</button>
+      <button class="icon-btn" id="btn-overwhelm" title="Overwhelm mode">🆘</button>
+      <button class="icon-btn" id="btn-settings" title="Settings">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Views -->
+  <main>
+
+    <!-- View: Home -->
+    <div id="view-home" class="view active">
+      <div class="greeting">
+        <p class="greeting-sub">Ready to study,</p>
+        <p class="greeting-name" id="user-name">Habib 🌿</p>
+      </div>
+
+      <button class="btn-primary" id="btn-start-studying">
+        Start Studying
+      </button>
+
+      <div class="deadlines" id="deadlines-list">
+        <!-- Injected by popup.js -->
+      </div>
+
+      <div class="quick-actions">
+        <p class="section-label">Quick actions</p>
+        <div class="quick-grid">
+          <button class="quick-btn" data-action="seren-quiz">🧪 Quiz me</button>
+          <button class="quick-btn" data-action="seren-schedule">📅 Schedule</button>
+          <button class="quick-btn" data-action="seren-save">💾 Save note</button>
+          <button class="quick-btn" data-action="seren-summarize">📝 Summarize</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- View: Chat -->
+    <div id="view-chat" class="view">
+      <button class="back-btn" id="btn-back">← Back</button>
+      <div class="chat-messages" id="chat-messages">
+        <div class="message seren">
+          <p>Hi! What do you want to work on today?</p>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input
+          type="text"
+          id="chat-input"
+          class="chat-input"
+          placeholder="Ask Seren anything..."
+        />
+        <button class="send-btn" id="btn-send">→</button>
+      </div>
+    </div>
+
+    <!-- View: Focus session -->
+    <div id="view-focus" class="view">
+      <button class="back-btn" id="btn-back-focus">← Back</button>
+      <div class="focus-content">
+        <p class="focus-label">Focus session</p>
+        <p class="focus-timer" id="focus-timer">25:00</p>
+        <div class="focus-btns">
+          <button class="btn-primary" id="btn-focus-start">Start</button>
+          <button class="btn-secondary" id="btn-focus-reset">Reset</button>
+        </div>
+        <textarea
+          id="focus-log"
+          class="focus-log"
+          placeholder="What are you working on?"
+        ></textarea>
+      </div>
+    </div>
+
+    <!-- View: Overwhelm mode -->
+    <div id="view-overwhelm" class="view">
+      <button class="back-btn" id="btn-back-overwhelm">← Back</button>
+      <div class="overwhelm-content">
+        <p class="overwhelm-emoji">😮‍💨</p>
+        <p class="overwhelm-title">One thing at a time.</p>
+        <p class="overwhelm-desc">Here's the only thing you need to do right now:</p>
+        <div class="overwhelm-task" id="overwhelm-task">
+          <!-- Injected by popup.js -->
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>
