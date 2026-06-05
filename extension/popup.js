@@ -1,4 +1,3 @@
-// ── Constants ──
 const API_BASE = 'http://localhost:8000'
 
 const ACTION_PROMPTS = {
@@ -10,52 +9,107 @@ const ACTION_PROMPTS = {
   'seren-save':      (text) => `Confirm that the following has been saved to my notes and give a brief summary:\n\n${text}`,
 }
 
-// ── Views ──
+// Detect if we're running in a full tab or as a popup
+const isTabMode = window.innerWidth >= 600
+
+// ── View management ──────────────────────────────────────────────
+
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.getElementById(id).classList.add('active')
 }
 
-// ── Greeting ──
-function loadGreeting() {
-  chrome.storage.local.get(['userName'], (res) => {
-    const name = res.userName || 'there'
-    document.getElementById('user-name').textContent = `${name} 🌿`
+// In tab mode, switching panels also updates sidebar nav active state
+function showPanel(panelId) {
+  showView('view-' + panelId)
+  document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.panel === panelId)
   })
 }
 
-// ── Deadlines ──
-function loadDeadlines() {
-  const container = document.getElementById('deadlines-list')
-  const mockDeadlines = [
-    { title: 'MAT1320 — Midterm', date: 'in 3 days', urgency: 'urgent' },
-    { title: 'CSI2110 — Assignment 3', date: 'in 6 days', urgency: 'soon' },
-    { title: 'PHI1101 — Essay', date: 'in 12 days', urgency: 'normal' },
-  ]
+// ── Greeting ─────────────────────────────────────────────────────
 
-  container.innerHTML = mockDeadlines.map(d => `
-    <div class="deadline-item">
-      <span class="deadline-dot ${d.urgency}"></span>
-      <div class="deadline-info">
-        <p class="deadline-title">${d.title}</p>
-        <p class="deadline-date">${d.date}</p>
-      </div>
-      <span class="deadline-badge ${d.urgency}">${d.urgency.charAt(0).toUpperCase() + d.urgency.slice(1)}</span>
-    </div>
-  `).join('')
+function loadGreeting() {
+  chrome.storage.local.get(['userName'], (res) => {
+    const name = res.userName || 'there'
+    const popup = document.getElementById('user-name')
+    const sidebar = document.getElementById('sidebar-user-name')
+    if (popup) popup.textContent = name
+    if (sidebar) sidebar.textContent = name
+  })
 }
 
-// ── Overwhelm mode ──
+// ── Deadlines ─────────────────────────────────────────────────────
+
+function renderDeadlines(container, deadlines, dark = false) {
+  if (!container) return
+
+  if (deadlines.length === 0) {
+    if (dark) {
+      container.innerHTML = `
+        <p style="font-size:12px;color:rgba(255,255,255,0.3);padding:4px 0;">No upcoming deadlines.</p>
+      `
+    } else {
+      container.innerHTML = `
+        <div class="empty-state">
+          <p class="empty-state-text">No upcoming deadlines.</p>
+          <button class="empty-state-cta" id="btn-import-schedule">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Import your schedule
+          </button>
+        </div>
+      `
+      document.getElementById('btn-import-schedule')?.addEventListener('click', () => {
+        showView('view-chat')
+        sendToSeren('I want to import my course schedule. How do I do that?')
+      })
+    }
+    return
+  }
+
+  if (dark) {
+    container.innerHTML = deadlines.map(d => `
+      <div class="sidebar-deadline-item">
+        <span class="deadline-dot ${d.urgency}" style="flex-shrink:0;"></span>
+        <span class="sidebar-deadline-title">${d.title}</span>
+        <span class="sidebar-deadline-date">${d.date}</span>
+      </div>
+    `).join('')
+  } else {
+    container.innerHTML = deadlines.map(d => `
+      <div class="deadline-item">
+        <span class="deadline-dot ${d.urgency}"></span>
+        <div class="deadline-info">
+          <p class="deadline-title">${d.title}</p>
+          <p class="deadline-date">${d.date}</p>
+        </div>
+        <span class="deadline-badge ${d.urgency}">${d.urgency.charAt(0).toUpperCase() + d.urgency.slice(1)}</span>
+      </div>
+    `).join('')
+  }
+}
+
+function loadDeadlines() {
+  const deadlines = [] // empty until user imports schedule
+  const popupContainer = document.getElementById('deadlines-list')
+  const sidebarContainer = document.getElementById('sidebar-deadlines-list')
+  renderDeadlines(popupContainer, deadlines, false)
+  renderDeadlines(sidebarContainer, deadlines, true)
+}
+
 function loadOverwhelmTask() {
   const container = document.getElementById('overwhelm-task')
-  const mockTask = { title: 'MAT1320 — Midterm', date: 'Due in 3 days' }
+  if (!container) return
   container.innerHTML = `
-    <p class="overwhelm-task-title">${mockTask.title}</p>
-    <p class="overwhelm-task-date">${mockTask.date}</p>
+    <p class="overwhelm-task-title">No tasks found</p>
+    <p class="overwhelm-task-date">Import your schedule to get started</p>
   `
 }
 
-// ── Chat ──
+// ── Chat ──────────────────────────────────────────────────────────
+
 function appendMessage(role, text) {
   const container = document.getElementById('chat-messages')
   const div = document.createElement('div')
@@ -70,7 +124,7 @@ function appendLoading() {
   const div = document.createElement('div')
   div.className = 'message seren loading'
   div.id = 'loading-msg'
-  div.innerHTML = `<p></p>`
+  div.innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div>`
   container.appendChild(div)
   container.scrollTop = container.scrollHeight
 }
@@ -81,9 +135,13 @@ function removeLoading() {
 }
 
 async function sendToSeren(userText) {
+  if (isTabMode) {
+    showPanel('chat')
+  } else {
+    showView('view-chat')
+  }
   appendMessage('user', userText)
   appendLoading()
-
   try {
     const response = await fetch(`${API_BASE}/ai/chat`, {
       method: 'POST',
@@ -99,47 +157,75 @@ async function sendToSeren(userText) {
   }
 }
 
-// ── Focus timer ──
+// ── Focus timer ───────────────────────────────────────────────────
+
 let focusInterval = null
 let focusSeconds = 25 * 60
+const FOCUS_TOTAL = 25 * 60
 
 function updateTimerDisplay() {
   const m = String(Math.floor(focusSeconds / 60)).padStart(2, '0')
   const s = String(focusSeconds % 60).padStart(2, '0')
   document.getElementById('focus-timer').textContent = `${m}:${s}`
+  const progress = document.getElementById('focus-progress')
+  if (progress) {
+    const circumference = 326.7
+    progress.style.strokeDashoffset = circumference * (1 - focusSeconds / FOCUS_TOTAL)
+  }
 }
 
-// ── Pending action from context menu ──
+// ── Pending actions (from context menu) ──────────────────────────
+
 function checkPendingAction() {
   chrome.storage.local.get(['pendingQuery', 'pendingAction'], (res) => {
     if (res.pendingQuery && res.pendingAction) {
       const prompt = ACTION_PROMPTS[res.pendingAction]
         ? ACTION_PROMPTS[res.pendingAction](res.pendingQuery)
         : res.pendingQuery
-
       chrome.storage.local.remove(['pendingQuery', 'pendingAction'])
-      showView('view-chat')
       sendToSeren(prompt)
     }
   })
 }
 
-// ── Event listeners ──
+// ── Init ──────────────────────────────────────────────────────────
+
 document.addEventListener('DOMContentLoaded', () => {
   loadGreeting()
   loadDeadlines()
   loadOverwhelmTask()
   checkPendingAction()
 
-  // Navigation
-  document.getElementById('btn-start-studying').addEventListener('click', () => showView('view-chat'))
-  document.getElementById('btn-focus').addEventListener('click', () => showView('view-focus'))
-  document.getElementById('btn-overwhelm').addEventListener('click', () => showView('view-overwhelm'))
-  document.getElementById('btn-back').addEventListener('click', () => showView('view-home'))
-  document.getElementById('btn-back-focus').addEventListener('click', () => showView('view-home'))
-  document.getElementById('btn-back-overwhelm').addEventListener('click', () => showView('view-home'))
+  // In tab mode, default to chat panel
+  if (isTabMode) {
+    showPanel('chat')
+  }
 
-  // Quick actions
+  // ── Sidebar nav (tab mode) ──
+  document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
+    btn.addEventListener('click', () => showPanel(btn.dataset.panel))
+  })
+
+  // Sidebar quick actions → go to chat and send
+  document.querySelectorAll('.sidebar-quick-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.action
+      const prompt = ACTION_PROMPTS[action]
+        ? ACTION_PROMPTS[action]('(no text selected — prompt the user)')
+        : 'How can I help you?'
+      sendToSeren(prompt)
+    })
+  })
+
+  // ── Popup-mode navigation ──
+  document.getElementById('btn-start-studying')?.addEventListener('click', () => showView('view-chat'))
+  document.getElementById('btn-focus')?.addEventListener('click', () => showView('view-focus'))
+  document.getElementById('btn-overwhelm')?.addEventListener('click', () => showView('view-overwhelm'))
+  document.getElementById('btn-back')?.addEventListener('click', () => showView('view-home'))
+  document.getElementById('btn-back-focus')?.addEventListener('click', () => showView('view-home'))
+  document.getElementById('btn-back-overwhelm')?.addEventListener('click', () => showView('view-home'))
+
+  // Popup quick actions
   document.querySelectorAll('.quick-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action
@@ -151,8 +237,15 @@ document.addEventListener('DOMContentLoaded', () => {
     })
   })
 
-  // Chat send
-  document.getElementById('btn-send').addEventListener('click', () => {
+  // ── Expand to tab ──
+  document.getElementById('btn-expand')?.addEventListener('click', () => {
+    if (typeof chrome !== 'undefined' && chrome.tabs) {
+      chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') })
+    }
+  })
+
+  // ── Chat send ──
+  document.getElementById('btn-send')?.addEventListener('click', () => {
     const input = document.getElementById('chat-input')
     const text = input.value.trim()
     if (!text) return
@@ -160,12 +253,12 @@ document.addEventListener('DOMContentLoaded', () => {
     sendToSeren(text)
   })
 
-  document.getElementById('chat-input').addEventListener('keydown', (e) => {
+  document.getElementById('chat-input')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('btn-send').click()
   })
 
-  // Focus timer
-  document.getElementById('btn-focus-start').addEventListener('click', () => {
+  // ── Focus timer controls ──
+  document.getElementById('btn-focus-start')?.addEventListener('click', () => {
     const btn = document.getElementById('btn-focus-start')
     if (focusInterval) {
       clearInterval(focusInterval)
@@ -186,10 +279,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })
 
-  document.getElementById('btn-focus-reset').addEventListener('click', () => {
+  document.getElementById('btn-focus-reset')?.addEventListener('click', () => {
     clearInterval(focusInterval)
     focusInterval = null
-    focusSeconds = 25 * 60
+    focusSeconds = FOCUS_TOTAL
     updateTimerDisplay()
     document.getElementById('btn-focus-start').textContent = 'Start'
   })

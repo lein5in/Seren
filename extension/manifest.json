@@ -15,11 +15,12 @@
   },
 
   "permissions": [
-    "contextMenus",
-    "storage",
-    "activeTab",
-    "scripting"
-  ],
+  "contextMenus",
+  "storage",
+  "activeTab",
+  "scripting",
+  "tabs"
+],
 
   "host_permissions": [
     "http://localhost:8000/*"
