@@ -162,4 +162,4 @@ Seren runs at approximately **$0.05–0.15/day** in API costs for active use.
 
 ---
 
-Built by Ibrahim · University of Ottawa · 2025–2026
+**Built by Ibrahim · University of Ottawa · April2026 - Present**
