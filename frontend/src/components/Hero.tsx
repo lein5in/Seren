@@ -1,7 +1,18 @@
+import { useNavigate } from 'react-router-dom'
 import { useLang } from '../context/LangContext'
 
 export default function Hero() {
   const { t } = useLang()
+  const navigate = useNavigate()
+
+  function handleChromeBtn() {
+    const stored = localStorage.getItem('seren_user')
+    if (stored) {
+      navigate('/dashboard')
+    } else {
+      navigate('/register')
+    }
+  }
 
   return (
     <section className="min-h-screen pt-[120px] pb-20 px-[5%] grid grid-cols-1 lg:grid-cols-2 items-center gap-16 relative overflow-hidden">
@@ -15,7 +26,7 @@ export default function Hero() {
       <div className="relative z-10">
         <div className="inline-flex items-center gap-2 bg-[#E1F5EE] border border-[#9FE1CB] rounded-full px-4 py-1.5 text-xs text-[#0F6E56] tracking-widest font-medium mb-7">
           <span className="w-1.5 h-1.5 rounded-full bg-[#1D9E75] animate-pulse" />
-          {t('YOUR DAILY STUDY COMPANION', 'VOTRE COMPAGNON D\'ÉTUDES QUOTIDIEN')}
+          {t('YOUR DAILY STUDY COMPANION', "VOTRE COMPAGNON D'ÉTUDES QUOTIDIEN")}
         </div>
 
         <h1 className="font-display text-[clamp(40px,5vw,64px)] leading-[1.1] text-[#085041] mb-6">
@@ -26,17 +37,23 @@ export default function Hero() {
         <p className="text-lg text-[#88877F] leading-relaxed mb-10 max-w-[480px] font-light">
           {t(
             'Seren is the AI companion that knows your courses, revises with you, and remembers everything — right where you study.',
-            'Seren est le compagnon IA qui connaît vos cours, révise avec vous et se souvient de tout — là où vous étudiez.'
+            "Seren est le compagnon IA qui connaît vos cours, révise avec vous et se souvient de tout — là où vous étudiez."
           )}
         </p>
 
         <div className="flex gap-4 flex-wrap items-center">
-          <button className="bg-[#0F6E56] text-white text-[15px] px-8 py-3.5 rounded-full border-none cursor-pointer font-body font-medium hover:bg-[#085041] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(15,110,86,0.25)] transition-all duration-200">
-            {t('Add to Chrome — it\'s free', 'Ajouter à Chrome — c\'est gratuit')}
+          <button
+            onClick={handleChromeBtn}
+            className="bg-[#0F6E56] text-white text-[15px] px-8 py-3.5 rounded-full border-none cursor-pointer font-body font-medium hover:bg-[#085041] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(15,110,86,0.25)] transition-all duration-200"
+          >
+            {t("Add to Chrome — it's free", "Ajouter à Chrome — c'est gratuit")}
           </button>
-          <button className="text-[15px] text-[#0F6E56] bg-transparent border border-[#9FE1CB] px-7 py-3.5 rounded-full cursor-pointer font-body hover:border-[#1D9E75] hover:bg-[#E1F5EE] transition-all duration-200">
+          <a
+            href="#how"
+            className="text-[15px] text-[#0F6E56] bg-transparent border border-[#9FE1CB] px-7 py-3.5 rounded-full cursor-pointer font-body hover:border-[#1D9E75] hover:bg-[#E1F5EE] transition-all duration-200 no-underline"
+          >
             {t('See how it works', 'Voir comment ça marche')}
-          </button>
+          </a>
         </div>
 
         <p className="text-xs text-[#88877F] mt-4">
@@ -63,7 +80,7 @@ export default function Hero() {
         {/* Laptop wrapper */}
         <div className="relative w-[420px] z-10">
 
-          {/* ── Screen lid ── */}
+          {/* Screen lid */}
           <div
             className="relative w-full rounded-t-[16px] overflow-hidden"
             style={{
@@ -72,22 +89,13 @@ export default function Hero() {
               boxShadow: '0 -1px 0 #f0f0f0 inset, 0 1px 0 #b8b8b8 inset, 0 -20px 40px rgba(0,0,0,0.06)',
             }}
           >
-            {/* Camera notch */}
             <div className="flex justify-center mb-2">
               <div className="w-1.5 h-1.5 rounded-full bg-[#b8b8b8] border border-[#c8c8c8]" />
             </div>
-
-            {/* Screen bezel — thin silver */}
             <div
               className="w-full overflow-hidden"
-              style={{
-                borderRadius: '6px 6px 0 0',
-                aspectRatio: '16/10',
-                background: '#1a1a1a',
-                padding: '2px',
-              }}
+              style={{ borderRadius: '6px 6px 0 0', aspectRatio: '16/10', background: '#1a1a1a', padding: '2px' }}
             >
-              {/* Screen content */}
               <div className="w-full h-full bg-white relative overflow-hidden" style={{ borderRadius: '4px 4px 0 0' }}>
 
                 {/* Browser bar */}
@@ -106,7 +114,7 @@ export default function Hero() {
                   </div>
                 </div>
 
-                {/* Page — minimal */}
+                {/* Page content */}
                 <div className="px-6 pt-4 pb-2 opacity-80">
                   <p className="text-[7px] text-[#aaa] uppercase tracking-widest mb-1">CSI2110 — Week 6</p>
                   <p className="text-[12px] font-semibold text-[#1a1a1a] mb-3">Binary Search Trees</p>
@@ -127,10 +135,7 @@ export default function Hero() {
                 {/* Seren popup */}
                 <div
                   className="absolute right-3 top-[36px] w-[148px] bg-white overflow-hidden"
-                  style={{
-                    borderRadius: '12px',
-                    boxShadow: '0 8px 40px rgba(0,0,0,0.14), 0 0 0 0.5px rgba(15,110,86,0.25)',
-                  }}
+                  style={{ borderRadius: '12px', boxShadow: '0 8px 40px rgba(0,0,0,0.14), 0 0 0 0.5px rgba(15,110,86,0.25)' }}
                 >
                   <div className="bg-[#0F6E56] px-3 py-2.5 flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
@@ -142,11 +147,9 @@ export default function Hero() {
                     </div>
                     <span className="text-[10px]">🌿</span>
                   </div>
-
                   <div className="p-3">
                     <p className="text-[8px] text-[#88877F] mb-0.5">{t('Ready to study,', 'Prêt à étudier,')}</p>
                     <p className="font-display text-[13px] text-[#085041] mb-2.5">Habib 🌿</p>
-
                     <div className="bg-[#E1F5EE] rounded-lg p-2 mb-2.5">
                       <p className="text-[7px] text-[#0F6E56] font-medium mb-1.5">{t('Where do you start?', 'Par où commencer ?')}</p>
                       <div className="flex flex-col gap-1">
@@ -154,13 +157,10 @@ export default function Hero() {
                           t('📖 Explain BST deletion', '📖 Expliquer BST'),
                           t('🧪 Quiz me on Week 6', '🧪 Quiz semaine 6'),
                         ].map(action => (
-                          <div key={action} className="text-[7px] bg-white text-[#0F6E56] rounded-md px-2 py-1.5">
-                            {action}
-                          </div>
+                          <div key={action} className="text-[7px] bg-white text-[#0F6E56] rounded-md px-2 py-1.5">{action}</div>
                         ))}
                       </div>
                     </div>
-
                     {[
                       { dot: 'bg-red-400', title: 'MAT1320 — Midterm', date: t('in 3 days', 'dans 3 jours'), badge: t('Urgent', 'Urgent'), badgeStyle: 'bg-red-50 text-red-600' },
                       { dot: 'bg-amber-400', title: 'CSI2110 — A3', date: t('in 6 days', 'dans 6 jours'), badge: t('Soon', 'Bientôt'), badgeStyle: 'bg-amber-50 text-amber-600' },
@@ -181,41 +181,27 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* ── Hinge ── */}
-          <div style={{
-            height: '4px',
-            background: 'linear-gradient(to bottom, #b8b8b8, #c8c8c8)',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-          }} />
+          {/* Hinge */}
+          <div style={{ height: '4px', background: 'linear-gradient(to bottom, #b8b8b8, #c8c8c8)', boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }} />
 
-          {/* ── Base ── */}
+          {/* Base */}
           <div style={{
             background: 'linear-gradient(160deg, #e0e0e0 0%, #cacaca 50%, #c0c0c0 100%)',
-            height: '20px',
-            borderRadius: '0 0 6px 6px',
-            boxShadow: '0 1px 0 #f0f0f0 inset',
-            position: 'relative',
+            height: '20px', borderRadius: '0 0 6px 6px',
+            boxShadow: '0 1px 0 #f0f0f0 inset', position: 'relative',
           }}>
-            {/* Trackpad */}
             <div style={{
-              width: '56px',
-              height: '9px',
-              background: '#b8b8b8',
-              border: '0.5px solid #c8c8c8',
-              borderRadius: '3px',
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
+              width: '56px', height: '9px', background: '#b8b8b8',
+              border: '0.5px solid #c8c8c8', borderRadius: '3px',
+              position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
             }} />
           </div>
 
-          {/* ── Desk shadow ── */}
+          {/* Desk shadow */}
           <div style={{
             height: '8px',
             background: 'linear-gradient(to bottom, rgba(0,0,0,0.06), transparent)',
-            borderRadius: '0 0 50% 50%',
-            marginTop: '1px',
+            borderRadius: '0 0 50% 50%', marginTop: '1px',
           }} />
 
         </div>

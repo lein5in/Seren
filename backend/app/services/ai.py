@@ -1,13 +1,10 @@
 import os
+import json
 import anthropic
 from dotenv import load_dotenv
 from typing import Optional
 
 load_dotenv()
-
-# ========================
-# Client Setup
-# ========================
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -35,29 +32,103 @@ Important rules:
 - If a user seems overwhelmed, focus on just ONE thing at a time
 - Keep responses concise and warm — never clinical or robotic
 - Use gentle, encouraging language at all times
+- Use Markdown formatting in your responses: **bold** for important points, tables for comparisons or schedules, bullet lists for steps, `code` for technical terms
 """
 
-# ========================
-# Core Chat Function
-# ========================
+FLASHCARD_SYSTEM_PROMPT = """
+You are Seren, a study companion. The user wants flashcards.
+
+Return ONLY a valid JSON object, no text before or after, no markdown code fences. Format:
+{
+  "type": "flashcards",
+  "topic": "topic name",
+  "cards": [
+    {"front": "Question or term", "back": "Answer or definition"},
+    {"front": "Question or term", "back": "Answer or definition"}
+  ]
+}
+
+Generate 5 to 8 flashcards. Make them clear, concise, and educational.
+"""
+
+QUIZ_SYSTEM_PROMPT = """
+You are Seren, a study companion. The user wants a quiz.
+
+Return ONLY a valid JSON object, no text before or after, no markdown code fences. Format:
+{
+  "type": "quiz",
+  "topic": "topic name",
+  "questions": [
+    {
+      "question": "The question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct": 0
+    }
+  ]
+}
+
+"correct" is the index (0-3) of the correct option in the options array.
+Generate 4 to 6 questions. Make them challenging but fair.
+"""
+
+
+def detect_message_type(message: str) -> str:
+    """Detect if the message is asking for flashcards, quiz, or regular chat."""
+    msg = message.lower()
+    if any(word in msg for word in ['flashcard', 'flash card', 'carte mémoire', 'fiche']):
+        return 'flashcard'
+    if any(word in msg for word in ['quiz me', 'quiz', 'test me', 'question me', 'interroge']):
+        return 'quiz'
+    return 'text'
+
 
 def chat_with_seren(
     user_message: str,
     conversation_history: list,
     user_context: Optional[dict] = None
-) -> str:
+) -> dict:
     """
     Send a message to Seren and get a response.
-    Includes user context (profile, upcoming events) if available.
+    Returns a dict with 'type' and 'content'.
     """
+    message_type = detect_message_type(user_message)
 
-    # Build context string if available
+    # ── Flashcard mode ──
+    if message_type == 'flashcard':
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1500,
+            system=FLASHCARD_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_message}]
+        )
+        try:
+            raw = response.content[0].text.strip()
+            data = json.loads(raw)
+            return {"type": "flashcards", "content": data}
+        except Exception:
+            return {"type": "text", "content": response.content[0].text}
+
+    # ── Quiz mode ──
+    if message_type == 'quiz':
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1500,
+            system=QUIZ_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_message}]
+        )
+        try:
+            raw = response.content[0].text.strip()
+            data = json.loads(raw)
+            return {"type": "quiz", "content": data}
+        except Exception:
+            return {"type": "text", "content": response.content[0].text}
+
+    # ── Regular chat ──
     context_block = ""
     if user_context:
         name = user_context.get("name", "the student")
         anxiety = user_context.get("anxiety_level", "medium")
         events = user_context.get("events", [])
-
         context_block = f"""
 Current user context:
 - Name: {name}
@@ -66,15 +137,13 @@ Current user context:
 """
         if events:
             context_block += "- Next deadlines:\n"
-            for e in events[:3]:  # Show max 3 to avoid overwhelming
+            for e in events[:3]:
                 context_block += f"  • {e['title']} — {e['deadline']}\n"
 
-    # Build system prompt with context
     system = SEREN_SYSTEM_PROMPT
     if context_block:
         system += f"\n\n{context_block}"
 
-    # Add new user message to history
     messages = conversation_history + [{"role": "user", "content": user_message}]
 
     response = client.messages.create(
@@ -84,17 +153,10 @@ Current user context:
         messages=messages
     )
 
-    return response.content[0].text
+    return {"type": "text", "content": response.content[0].text}
 
-
-# ========================
-# Onboarding Function
-# ========================
 
 def get_onboarding_message(step: int, user_name: str) -> str:
-    """
-    Returns a caring onboarding message for each step.
-    """
     onboarding_prompt = f"""
 The user's name is {user_name}. This is onboarding step {step}.
 
@@ -106,30 +168,20 @@ Step 5: Wrap up onboarding warmly and tell them Seren is ready to help them.
 
 Respond only for step {step}. Keep it short, warm, and conversational.
 """
-
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=300,
         system=SEREN_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": onboarding_prompt}]
     )
-
     return response.content[0].text
 
 
-# ========================
-# Overwhelm Mode Function
-# ========================
-
 def get_overwhelm_response(user_name: str, next_event: Optional[dict] = None) -> str:
-    """
-    Returns a single calming task and reassuring message when user is overwhelmed.
-    """
     if next_event:
         prompt = f"""
-{user_name} is feeling overwhelmed right now. 
+{user_name} is feeling overwhelmed right now.
 Their most urgent upcoming task is: "{next_event['title']}" due {next_event['deadline']}.
-
 Give them one single, small, concrete action they can do RIGHT NOW to make progress on this task.
 Then reassure them warmly. Keep it very short — 3 to 4 sentences maximum.
 """
@@ -139,12 +191,10 @@ Then reassure them warmly. Keep it very short — 3 to 4 sentences maximum.
 Reassure them warmly and suggest one small self-care action they can take right now.
 Keep it very short — 3 to 4 sentences maximum.
 """
-
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=300,
         system=SEREN_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}]
     )
-
     return response.content[0].text

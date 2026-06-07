@@ -28,6 +28,7 @@ export default function Navbar() {
     localStorage.removeItem('seren_token')
     localStorage.removeItem('seren_user')
     setUserName(null)
+    navigate('/')
   }
 
   return (
@@ -45,15 +46,16 @@ export default function Navbar() {
         <span className="font-display text-[22px] text-[#0F6E56] tracking-wide">Seren</span>
       </a>
 
-      {/* Links */}
+      {/* Nav links */}
       <div className="hidden md:flex items-center gap-8">
         {[
-          { href: '#features', en: 'Features', fr: 'Fonctionnalités' },
-          { href: '#how', en: 'How it works', fr: 'Comment ça marche' },
-          { href: '#pricing', en: 'Pricing', fr: 'Tarifs' },
-          { href: '#about', en: 'About', fr: 'À propos' },
+          { href: '#features',     en: 'Features',      fr: 'Fonctionnalités' },
+          { href: '#how',          en: 'How it works',  fr: 'Comment ça marche' },
+          { href: '#pricing',      en: 'Pricing',       fr: 'Tarifs' },
+          { href: '#about',        en: 'About',         fr: 'À propos' },
         ].map(link => (
-          <a key={link.href} href={link.href} className="text-sm text-[#88877F] hover:text-[#0F6E56] transition-colors duration-200 no-underline">
+          <a key={link.href} href={link.href}
+            className="text-sm text-[#88877F] hover:text-[#0F6E56] transition-colors duration-200 no-underline">
             {t(link.en, link.fr)}
           </a>
         ))}
@@ -65,26 +67,38 @@ export default function Navbar() {
         {/* Lang toggle */}
         <div className="flex bg-[#E1F5EE] rounded-full p-[3px] gap-[2px]">
           {(['en', 'fr'] as const).map(l => (
-            <button
-              key={l}
-              onClick={() => setLang(l)}
+            <button key={l} onClick={() => setLang(l)}
               className={`text-xs px-3 py-1 rounded-full border-none cursor-pointer font-body transition-all duration-200 ${
-                lang === l
-                  ? 'bg-white text-[#0F6E56] font-medium shadow-sm'
-                  : 'bg-transparent text-[#88877F]'
-              }`}
-            >
+                lang === l ? 'bg-white text-[#0F6E56] font-medium shadow-sm' : 'bg-transparent text-[#88877F]'
+              }`}>
               {l.toUpperCase()}
             </button>
           ))}
         </div>
 
-        {/* Auth buttons */}
+        {/* Auth state */}
         {userName ? (
           <div className="flex items-center gap-3">
-            <span className="text-sm text-[#0F6E56] font-medium">
+            {/* Dashboard button — visible quand connecté */}
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-1.5 text-sm text-[#0F6E56] font-medium border border-[#9FE1CB] px-4 py-1.5 rounded-full bg-transparent cursor-pointer hover:bg-[#E1F5EE] transition-all duration-200 font-body"
+            >
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="#0F6E56" strokeWidth="1.8"/>
+                <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="#0F6E56" strokeWidth="1.8"/>
+                <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="#0F6E56" strokeWidth="1.8"/>
+                <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="#0F6E56" strokeWidth="1.8"/>
+              </svg>
+              {t('Dashboard', 'Tableau de bord')}
+            </button>
+
+            {/* Prénom */}
+            <span className="text-sm text-[#88877F]">
               {t('Hi', 'Salut')}, {userName.split(' ')[0]}
             </span>
+
+            {/* Logout */}
             <button
               onClick={handleLogout}
               className="text-sm text-[#88877F] hover:text-[#0F6E56] border-none bg-transparent cursor-pointer font-body transition-colors duration-200"
