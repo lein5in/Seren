@@ -25,7 +25,7 @@ export default function Register() {
       if (!res.ok) { setError(data.detail || 'Something went wrong.'); setLoading(false); return }
       localStorage.setItem('seren_token', data.token)
       localStorage.setItem('seren_user', JSON.stringify({ id: data.user_id, name: data.name, email: data.email }))
-      navigate('/dashboard')
+      navigate('/chat')
     } catch {
       setError('Could not reach the server. Is the backend running?')
       setLoading(false)

@@ -11,6 +11,9 @@ const ACTION_PROMPTS = {
 
 const isTabMode = window.innerWidth >= 600
 
+// ── Pending file upload state ─────────────────────────────────────
+let pendingUploadedFile = null // { filename, characters, userId }
+
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.getElementById(id).classList.add('active')
@@ -156,7 +159,50 @@ function loadOverwhelmTask(events) {
   })
 }
 
+// ── Input file chip ───────────────────────────────────────────────
+
+function showInputFileChip(filename) {
+  removeInputFileChip()
+  const chatFooter = document.querySelector('.chat-footer')
+  if (!chatFooter) return
+  const chip = document.createElement('div')
+  chip.className = 'input-file-chip'
+  chip.id = 'input-file-chip'
+  chip.innerHTML = `
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+    </svg>
+    <span>${filename}</span>
+    <button class="input-file-chip-remove" id="chip-remove">×</button>
+  `
+  chatFooter.insertBefore(chip, chatFooter.firstChild)
+  document.getElementById('chip-remove')?.addEventListener('click', () => {
+    removeInputFileChip()
+    pendingUploadedFile = null
+  })
+}
+
+function removeInputFileChip() {
+  document.getElementById('input-file-chip')?.remove()
+}
+
 // ── Chat messages ─────────────────────────────────────────────────
+
+function exportMessageAsPDF(text) {
+  const { jsPDF } = window.jspdf
+  const doc = new jsPDF()
+  const clean = text.replace(/#{1,6}\s/g, '').replace(/[*`_]/g, '')
+  const lines = doc.splitTextToSize(clean, 180)
+  doc.setFont('helvetica')
+  doc.setFontSize(9)
+  doc.setTextColor(150)
+  doc.text('Exported from Seren · your study companion', 15, 12)
+  doc.setTextColor(0)
+  doc.setFontSize(12)
+  doc.text(lines, 15, 24)
+  doc.save('seren-export.pdf')
+}
 
 function appendMessage(role, text) {
   const container = document.getElementById('chat-messages')
@@ -167,11 +213,19 @@ function appendMessage(role, text) {
     div.querySelectorAll('pre code').forEach(block => {
       if (typeof hljs !== 'undefined') hljs.highlightElement(block)
     })
+    if (text.length > 150) {
+      const exportBtn = document.createElement('button')
+      exportBtn.className = 'export-btn'
+      exportBtn.textContent = 'Export PDF'
+      exportBtn.addEventListener('click', () => exportMessageAsPDF(text))
+      div.appendChild(exportBtn)
+    }
   } else {
     div.innerHTML = `<p>${text}</p>`
   }
   container.appendChild(div)
   container.scrollTop = container.scrollHeight
+  saveHistory()
 }
 
 function appendLoading() {
@@ -187,6 +241,33 @@ function appendLoading() {
 function removeLoading() {
   const el = document.getElementById('loading-msg')
   if (el) el.remove()
+}
+
+function saveHistory() {
+  const messages = []
+  document.querySelectorAll('#chat-messages .message').forEach(div => {
+    if (div.classList.contains('loading')) return
+    messages.push({
+      role: div.classList.contains('user') ? 'user' : 'seren',
+      html: div.innerHTML
+    })
+  })
+  chrome.storage.local.set({ chatHistory: messages })
+}
+
+function restoreHistory() {
+  chrome.storage.local.get(['chatHistory'], (res) => {
+    if (!res.chatHistory || res.chatHistory.length === 0) return
+    const container = document.getElementById('chat-messages')
+    container.innerHTML = ''
+    res.chatHistory.forEach(msg => {
+      const div = document.createElement('div')
+      div.className = `message ${msg.role}`
+      div.innerHTML = msg.html
+      container.appendChild(div)
+    })
+    container.scrollTop = container.scrollHeight
+  })
 }
 
 // ── Flashcards ────────────────────────────────────────────────────
@@ -318,6 +399,83 @@ function appendQuiz(data) {
   container.scrollTop = container.scrollHeight
 }
 
+// ── Visual ────────────────────────────────────────────────────────
+
+function appendVisual(html) {
+  const container = document.getElementById('chat-messages')
+  const wrapper = document.createElement('div')
+  wrapper.style.cssText = 'width:100%;margin:4px 0;'
+
+  const header = document.createElement('div')
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'
+  header.innerHTML = `
+    <span style="font-size:10px;font-weight:600;color:#0F6E56;text-transform:uppercase;letter-spacing:0.08em;">Interactive visual</span>
+    <button id="visual-expand-btn" style="font-size:10px;color:#AEADA8;background:none;border:none;cursor:pointer;font-family:inherit;">Expand ↓</button>
+  `
+  wrapper.appendChild(header)
+
+  const iframe = document.createElement('iframe')
+  iframe.srcdoc = html
+  iframe.sandbox = 'allow-scripts'
+  iframe.style.cssText = 'width:100%;height:340px;border:1px solid #EEEEEC;border-radius:14px;display:block;transition:height 0.3s;'
+  wrapper.appendChild(iframe)
+
+  let expanded = false
+  header.querySelector('#visual-expand-btn').addEventListener('click', () => {
+    expanded = !expanded
+    iframe.style.height = expanded ? '560px' : '340px'
+    header.querySelector('#visual-expand-btn').textContent = expanded ? 'Collapse ↑' : 'Expand ↓'
+  })
+
+  container.appendChild(wrapper)
+  container.scrollTop = container.scrollHeight
+  saveHistory()
+}
+
+// ── Custom commands (synced via chrome.storage with Settings page) ─
+
+function loadSidebarCommands() {
+  const container = document.getElementById('sidebar-commands-list')
+  if (!container) return
+  chrome.storage.local.get(['seren_commands'], (res) => {
+    const commands = Array.isArray(res.seren_commands) ? res.seren_commands : []
+    if (commands.length === 0) {
+      container.innerHTML = ''
+      return
+    }
+    container.innerHTML = commands.map(cmd => `
+      <button class="sidebar-quick-item" data-command-id="${cmd.id}">
+        <span style="color:#5DCAA5;font-weight:700;font-size:11px;">/</span>
+        ${cmd.label}
+      </button>
+    `).join('')
+    container.querySelectorAll('[data-command-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cmd = commands.find(c => c.id === btn.dataset.commandId)
+        if (cmd) pasteIntoInput(cmd.prompt + ' ')
+      })
+    })
+  })
+}
+
+if (chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.seren_commands) loadSidebarCommands()
+  })
+}
+
+// ── Paste into input ──────────────────────────────────────────────
+
+function pasteIntoInput(text) {
+  const input = document.getElementById('chat-input')
+  if (!input) return
+  if (isTabMode) showPanel('chat')
+  else showView('view-chat')
+  input.value = text
+  input.focus()
+  input.setSelectionRange(text.length, text.length)
+}
+
 // ── Send to Seren ─────────────────────────────────────────────────
 
 async function sendToSeren(userText) {
@@ -342,6 +500,8 @@ async function sendToSeren(userText) {
         appendFlashcards(data.data)
       } else if (data.type === 'quiz' && data.data) {
         appendQuiz(data.data)
+      } else if (data.type === 'visual' && data.data) {
+        appendVisual(data.data)
       } else {
         appendMessage('seren', data.reply || 'Something went wrong.')
       }
@@ -368,14 +528,21 @@ function updateTimerDisplay() {
   }
 }
 
+// ── checkPendingAction → paste into input instead of auto-send ────
+
 function checkPendingAction() {
-  chrome.storage.local.get(['pendingQuery', 'pendingAction'], (res) => {
-    if (res.pendingQuery && res.pendingAction) {
+  chrome.storage.local.get(['pendingQuery', 'pendingAction', 'pendingPromptText'], (res) => {
+    if (res.pendingPromptText) {
+      // New format: content.js already built the full prompt from the user's command
+      chrome.storage.local.remove(['pendingQuery', 'pendingAction', 'pendingPromptText'])
+      pasteIntoInput(res.pendingPromptText)
+    } else if (res.pendingQuery && res.pendingAction) {
+      // Legacy format fallback (context menu still uses this)
       const prompt = ACTION_PROMPTS[res.pendingAction]
         ? ACTION_PROMPTS[res.pendingAction](res.pendingQuery)
         : res.pendingQuery
       chrome.storage.local.remove(['pendingQuery', 'pendingAction'])
-      sendToSeren(prompt)
+      pasteIntoInput(prompt)
     }
   })
 }
@@ -385,6 +552,8 @@ function checkPendingAction() {
 document.addEventListener('DOMContentLoaded', () => {
   loadGreeting()
   loadDeadlines()
+  loadSidebarCommands()
+  restoreHistory()
   checkPendingAction()
 
   if (isTabMode) showPanel('chat')
@@ -393,11 +562,12 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => showPanel(btn.dataset.panel))
   })
 
+  // Quick actions → paste into input
   document.querySelectorAll('.sidebar-quick-item').forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action
-      const prompt = ACTION_PROMPTS[action] ? ACTION_PROMPTS[action]('(no text selected)') : 'How can I help you?'
-      sendToSeren(prompt)
+      const prompt = ACTION_PROMPTS[action] ? ACTION_PROMPTS[action]('') : ''
+      pasteIntoInput(prompt)
     })
   })
 
@@ -408,12 +578,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-back-focus')?.addEventListener('click', () => showView('view-home'))
   document.getElementById('btn-back-overwhelm')?.addEventListener('click', () => showView('view-home'))
 
+  // Quick buttons → paste into input
   document.querySelectorAll('.quick-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action
-      const prompt = ACTION_PROMPTS[action] ? ACTION_PROMPTS[action]('(no text selected)') : 'How can I help you?'
+      const prompt = ACTION_PROMPTS[action] ? ACTION_PROMPTS[action]('') : ''
       showView('view-chat')
-      sendToSeren(prompt)
+      pasteIntoInput(prompt)
     })
   })
 
@@ -428,7 +599,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const text = input.value.trim()
     if (!text) return
     input.value = ''
+    // If there's a pending uploaded file, include it in context
+    if (pendingUploadedFile) {
+      removeInputFileChip()
+      pendingUploadedFile = null
+    }
     sendToSeren(text)
+  })
+
+  document.getElementById('btn-attach')?.addEventListener('click', () => {
+    document.getElementById('pdf-input').click()
+  })
+
+  document.getElementById('pdf-input')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    e.target.value = ''
+
+    chrome.storage.local.get(['userId', 'serenToken'], async (res) => {
+      if (!res.userId || !res.serenToken) {
+        appendMessage('seren', 'Please log in to upload documents.')
+        return
+      }
+      if (isTabMode) showPanel('chat')
+      else showView('view-chat')
+
+      appendLoading()
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      try {
+        const response = await fetch(`${API_BASE}/upload/pdf/${res.userId}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${res.serenToken}` },
+          body: formData
+        })
+        const data = await response.json()
+        removeLoading()
+        if (response.ok) {
+          pendingUploadedFile = { filename: data.filename, characters: data.characters }
+          // Show chip in input bar
+          showInputFileChip(data.filename)
+          // Confirm in chat
+          appendMessage('seren', `I've read **${data.filename}** (${data.characters.toLocaleString()} characters). What would you like to do with it?`)
+          // Pre-fill input so user can add their question
+          pasteIntoInput(`I've uploaded "${data.filename}". `)
+        } else {
+          appendMessage('seren', `Couldn't read that PDF: ${data.detail}`)
+        }
+      } catch {
+        removeLoading()
+        appendMessage('seren', 'Upload failed. Is the backend running?')
+      }
+    })
   })
 
   document.getElementById('chat-input')?.addEventListener('keydown', (e) => {
@@ -452,5 +676,13 @@ document.addEventListener('DOMContentLoaded', () => {
     clearInterval(focusInterval); focusInterval = null
     focusSeconds = FOCUS_TOTAL; updateTimerDisplay()
     document.getElementById('btn-focus-start').textContent = 'Start'
+  })
+
+  document.getElementById('btn-settings')?.addEventListener('click', () => {
+    chrome.tabs.create({ url: 'http://localhost:5173/settings' })
+  })
+
+  document.getElementById('btn-settings-sidebar')?.addEventListener('click', () => {
+  chrome.tabs.create({ url: 'http://localhost:5173/settings' })
   })
 })

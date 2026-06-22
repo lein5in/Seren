@@ -11,9 +11,12 @@ import CTA from './components/CTA'
 import Footer from './components/Footer'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
+import Chat from './pages/Chat'
+import Settings from './pages/Settings'
 
 function Landing() {
+  const user = localStorage.getItem('seren_user')
+  if (user) return <Navigate to="/chat" replace />
   return (
     <div className="app">
       <Navbar />
@@ -32,7 +35,7 @@ function Landing() {
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const user = localStorage.getItem('seren_user')
-  return user ? children : <Navigate to="/login" replace />
+  return user ? <>{children}</> : <Navigate to="/login" replace />
 }
 
 function App() {
@@ -42,9 +45,9 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={
-          <RequireAuth><Dashboard /></RequireAuth>
-        } />
+        <Route path="/chat" element={<RequireAuth><Chat /></RequireAuth>} />
+        <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
+        <Route path="/dashboard" element={<Navigate to="/chat" replace />} />
       </Routes>
     </BrowserRouter>
   )

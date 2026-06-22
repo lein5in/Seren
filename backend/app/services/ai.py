@@ -8,31 +8,31 @@ load_dotenv()
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
+MODEL = "claude-sonnet-4-6"
+
 SEREN_SYSTEM_PROMPT = """
-You are Seren, a calm and caring AI companion designed specifically for university students who experience anxiety.
+You are Seren, a smart and caring study companion for university students.
 
 Your personality:
-- You are warm, patient, and never rushed
-- You never overwhelm the user with too much information at once
-- You always acknowledge how the user feels before giving advice
-- You speak in a calm, reassuring tone — like a trusted friend who happens to be very organized
-- You break down tasks into small, manageable steps
-- You celebrate small wins and progress
-- You never judge or criticize
+- Warm and encouraging, but first and foremost HELPFUL and DIRECT
+- You answer the question first, then add a human touch if appropriate — never the other way around
+- You are concise. You never ask more than one follow-up question, and only when truly necessary
+- You never psychoanalyze the user or assume they are anxious unless they explicitly say so
+- You treat students as capable adults who know what they need
 
 Your role:
-- Help students manage their deadlines and schedules
-- Reduce anxiety around academic workload
-- Guide users through their day one step at a time
-- Ask questions to understand the user's needs before suggesting anything
+- Answer academic questions clearly and thoroughly
+- Help with any subject: science, math, history, literature, programming, etc.
+- Help students manage deadlines and study plans
+- Break down complex topics into understandable explanations
 
-Important rules:
-- Never dump a long list of tasks on the user at once
-- Always check in with how the user is feeling first
-- If a user seems overwhelmed, focus on just ONE thing at a time
-- Keep responses concise and warm — never clinical or robotic
-- Use gentle, encouraging language at all times
-- Use Markdown formatting in your responses: **bold** for important points, tables for comparisons or schedules, bullet lists for steps, `code` for technical terms
+Rules:
+- NEVER refuse to answer a general knowledge or academic question
+- NEVER say you "can't" do visualizations or diagrams — Seren can generate interactive visuals
+- NEVER start a response by asking how the user is feeling unless they brought it up first
+- Keep responses focused and well-structured
+- Use Markdown: **bold** for key terms, bullet lists for steps, tables for comparisons, `code` for technical terms
+- If a topic is not study-related, still answer it helpfully — curiosity is always valid
 """
 
 FLASHCARD_SYSTEM_PROMPT = """
@@ -71,14 +71,43 @@ Return ONLY a valid JSON object, no text before or after, no markdown code fence
 Generate 4 to 6 questions. Make them challenging but fair.
 """
 
+VISUAL_SYSTEM_PROMPT = """
+You are Seren, a study companion. The user wants a visual explanation of a concept.
+
+Generate a complete, self-contained HTML page that visualizes the concept clearly and interactively.
+
+Rules:
+- Use only vanilla HTML, CSS, and JavaScript
+- You may use Chart.js from https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js for data charts
+- For everything else (trees, graphs, algorithms, diagrams) use pure SVG and/or Canvas
+- Make it interactive: hover effects, click to step through, animations
+- IMPORTANT: Use a LIGHT background (#F6F6F4 or white) with dark text (#2C2C2A) so content is always visible
+- Accent color: #5DCAA5 and #0F6E56 for highlights and interactive elements
+- Typography: system-ui, sans-serif
+- Add a clear title at the top in #04342C
+- Label everything clearly — this is for learning
+- The visualization must fill the available space properly and be immediately visible on load
+- For algorithms: show step-by-step with Play/Pause/Reset controls
+- For trees/graphs: draw nodes with clear labels and edges
+- For data charts: use Chart.js with clean styling
+- Return ONLY the raw HTML starting with <!DOCTYPE html> — nothing else
+"""
+
 
 def detect_message_type(message: str) -> str:
-    """Detect if the message is asking for flashcards, quiz, or regular chat."""
     msg = message.lower()
     if any(word in msg for word in ['flashcard', 'flash card', 'carte mémoire', 'fiche']):
         return 'flashcard'
     if any(word in msg for word in ['quiz me', 'quiz', 'test me', 'question me', 'interroge']):
         return 'quiz'
+    if any(word in msg for word in [
+        'graphe', 'graph', 'chart', 'diagram', 'schéma', 'schema',
+        'visualise', 'visualize', 'montre', 'show me', 'arbre', 'tree',
+        'algorithme', 'algorithm', 'animation', 'animate', 'illustre',
+        'dessine', 'draw', 'représente', 'represent', 'visualisation',
+        'show a', 'draw a', 'plot', 'display a'
+    ]):
+        return 'visual'
     return 'text'
 
 
@@ -87,16 +116,12 @@ def chat_with_seren(
     conversation_history: list,
     user_context: Optional[dict] = None
 ) -> dict:
-    """
-    Send a message to Seren and get a response.
-    Returns a dict with 'type' and 'content'.
-    """
     message_type = detect_message_type(user_message)
 
     # ── Flashcard mode ──
     if message_type == 'flashcard':
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=MODEL,
             max_tokens=1500,
             system=FLASHCARD_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_message}]
@@ -111,7 +136,7 @@ def chat_with_seren(
     # ── Quiz mode ──
     if message_type == 'quiz':
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=MODEL,
             max_tokens=1500,
             system=QUIZ_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_message}]
@@ -123,6 +148,20 @@ def chat_with_seren(
         except Exception:
             return {"type": "text", "content": response.content[0].text}
 
+    # ── Visual mode ──
+    if message_type == 'visual':
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=4000,
+            system=VISUAL_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_message}]
+        )
+        html = response.content[0].text.strip()
+        if html.startswith("```"):
+            html = html.split("\n", 1)[-1]
+            html = html.rsplit("```", 1)[0].strip()
+        return {"type": "visual", "content": html}
+
     # ── Regular chat ──
     context_block = ""
     if user_context:
@@ -132,7 +171,6 @@ def chat_with_seren(
         context_block = f"""
 Current user context:
 - Name: {name}
-- Anxiety level: {anxiety}
 - Upcoming deadlines: {len(events)} in the next 7 days
 """
         if events:
@@ -140,14 +178,18 @@ Current user context:
             for e in events[:3]:
                 context_block += f"  • {e['title']} — {e['deadline']}\n"
 
-    system = SEREN_SYSTEM_PROMPT
+    pdf_block = ""
+    if user_context and user_context.get("pdf_content"):
+        pdf_block = f"\n\nThe user has uploaded a document called \"{user_context.get('pdf_filename', 'document.pdf')}\". Here is its content:\n\n{user_context['pdf_content']}\n\nThis document is available for the entire conversation. Use it to answer any question, even if the user doesn't explicitly mention the filename."
+
+    system = SEREN_SYSTEM_PROMPT + pdf_block
     if context_block:
         system += f"\n\n{context_block}"
 
     messages = conversation_history + [{"role": "user", "content": user_message}]
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=MODEL,
         max_tokens=1000,
         system=system,
         messages=messages
@@ -169,7 +211,7 @@ Step 5: Wrap up onboarding warmly and tell them Seren is ready to help them.
 Respond only for step {step}. Keep it short, warm, and conversational.
 """
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=MODEL,
         max_tokens=300,
         system=SEREN_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": onboarding_prompt}]
@@ -192,7 +234,7 @@ Reassure them warmly and suggest one small self-care action they can take right 
 Keep it very short — 3 to 4 sentences maximum.
 """
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=MODEL,
         max_tokens=300,
         system=SEREN_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}]

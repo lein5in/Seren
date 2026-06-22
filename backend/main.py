@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
-from app.routes import users, events, schedule, ai
+from app.routes import users, events, schedule, ai, upload 
 
 # Initialize the app
 app = FastAPI(
@@ -28,6 +28,7 @@ app.include_router(users.router)
 app.include_router(events.router)
 app.include_router(schedule.router)
 app.include_router(ai.router)
+app.include_router(upload.router)
 
 # ========================
 # Startup Event

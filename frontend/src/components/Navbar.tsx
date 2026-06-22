@@ -34,7 +34,6 @@ export default function Navbar() {
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-[5%] h-[68px] bg-white/90 backdrop-blur-md border-b border-[#E1F5EE] transition-shadow duration-300 ${scrolled ? 'shadow-[0_2px_20px_rgba(15,110,86,0.08)]' : ''}`}>
 
-      {/* Logo */}
       <a href="/" className="flex items-center gap-2 no-underline">
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
           <path d="M16 2 A14 14 0 1 1 26.1 22" stroke="#0F6E56" strokeWidth="2.5" strokeLinecap="round"/>
@@ -46,13 +45,12 @@ export default function Navbar() {
         <span className="font-display text-[22px] text-[#0F6E56] tracking-wide">Seren</span>
       </a>
 
-      {/* Nav links */}
       <div className="hidden md:flex items-center gap-8">
         {[
-          { href: '#features',     en: 'Features',      fr: 'Fonctionnalités' },
-          { href: '#how',          en: 'How it works',  fr: 'Comment ça marche' },
-          { href: '#pricing',      en: 'Pricing',       fr: 'Tarifs' },
-          { href: '#about',        en: 'About',         fr: 'À propos' },
+          { href: '#features', en: 'Features',     fr: 'Fonctionnalités' },
+          { href: '#how',      en: 'How it works',  fr: 'Comment ça marche' },
+          { href: '#pricing',  en: 'Pricing',       fr: 'Tarifs' },
+          { href: '#about',    en: 'About',         fr: 'À propos' },
         ].map(link => (
           <a key={link.href} href={link.href}
             className="text-sm text-[#88877F] hover:text-[#0F6E56] transition-colors duration-200 no-underline">
@@ -61,10 +59,7 @@ export default function Navbar() {
         ))}
       </div>
 
-      {/* Right side */}
       <div className="flex items-center gap-4">
-
-        {/* Lang toggle */}
         <div className="flex bg-[#E1F5EE] rounded-full p-[3px] gap-[2px]">
           {(['en', 'fr'] as const).map(l => (
             <button key={l} onClick={() => setLang(l)}
@@ -76,29 +71,21 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* Auth state */}
         {userName ? (
           <div className="flex items-center gap-3">
-            {/* Dashboard button — visible quand connecté */}
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/chat')}
               className="flex items-center gap-1.5 text-sm text-[#0F6E56] font-medium border border-[#9FE1CB] px-4 py-1.5 rounded-full bg-transparent cursor-pointer hover:bg-[#E1F5EE] transition-all duration-200 font-body"
             >
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="#0F6E56" strokeWidth="1.8"/>
-                <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="#0F6E56" strokeWidth="1.8"/>
-                <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="#0F6E56" strokeWidth="1.8"/>
-                <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="#0F6E56" strokeWidth="1.8"/>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                  stroke="#0F6E56" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              {t('Dashboard', 'Tableau de bord')}
+              {t('Open Seren', 'Ouvrir Seren')}
             </button>
-
-            {/* Prénom */}
             <span className="text-sm text-[#88877F]">
               {t('Hi', 'Salut')}, {userName.split(' ')[0]}
             </span>
-
-            {/* Logout */}
             <button
               onClick={handleLogout}
               className="text-sm text-[#88877F] hover:text-[#0F6E56] border-none bg-transparent cursor-pointer font-body transition-colors duration-200"

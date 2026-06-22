@@ -1,33 +1,41 @@
 // ── Seren content.js ─────────────────────────────────────────────
 // Shows a floating action bar when the user selects text on any page.
+// Also bridges chrome.storage access for the Seren web app (Settings page),
+// which runs as a normal webpage and has no direct chrome.storage access.
 
 ;(function () {
   // Guard against double-injection
   if (window.__serenInjected) return
   window.__serenInjected = true
 
-  const ACTIONS = [
-    {
-      id: 'seren-solve',
-      label: 'Solve',
-      svg: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
-    },
-    {
-      id: 'seren-summarize',
-      label: 'Summarize',
-      svg: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>`
-    },
-    {
-      id: 'seren-quiz',
-      label: 'Quiz me',
-      svg: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`
-    },
-    {
-      id: 'seren-save',
-      label: 'Save',
-      svg: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`
-    }
+  // ── Fallback default commands (used only if chrome.storage is empty) ──
+  const DEFAULT_COMMANDS = [
+    { id: 'seren-solve',     label: 'Solve',      prompt: 'Solve or explain the following:',                          isDefault: true, inTooltip: true },
+    { id: 'seren-summarize', label: 'Summarize',  prompt: 'Summarize the following in a clear and concise way:',       isDefault: true, inTooltip: true },
+    { id: 'seren-quiz',      label: 'Quiz me',    prompt: 'Generate a quiz based on the following content:',           isDefault: true, inTooltip: true },
+    { id: 'seren-save',      label: 'Save',       prompt: 'Confirm that the following has been saved to my notes and give a brief summary:', isDefault: true, inTooltip: true },
   ]
+
+  let cachedCommands = null // refreshed on selection + kept in sync via storage.onChanged
+
+  function loadCommands(callback) {
+    chrome.storage.local.get(['seren_commands'], (res) => {
+      const cmds = (res.seren_commands && Array.isArray(res.seren_commands) && res.seren_commands.length > 0)
+        ? res.seren_commands
+        : DEFAULT_COMMANDS
+      cachedCommands = cmds
+      callback(cmds)
+    })
+  }
+
+  // Keep cache fresh if commands change while the tooltip might be shown
+  if (chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.seren_commands) {
+        cachedCommands = changes.seren_commands.newValue || DEFAULT_COMMANDS
+      }
+    })
+  }
 
   let tooltip = null
   let toast = null
@@ -94,8 +102,6 @@
       background: rgba(255,255,255,0.1);
       color: rgba(255,255,255,0.95);
     }
-    #seren-tooltip .seren-action svg { flex-shrink: 0; opacity: 0.7; }
-    #seren-tooltip .seren-action:hover svg { opacity: 1; }
     #seren-tooltip .seren-divider {
       width: 1px;
       height: 14px;
@@ -153,61 +159,65 @@
 
   function showTooltip(selectedText, rect) {
     removeTooltip()
+    loadCommands((commands) => {
+      const tooltipCommands = commands.filter(c => c.inTooltip)
+      if (tooltipCommands.length === 0) return
 
-    tooltip = document.createElement('div')
-    tooltip.id = 'seren-tooltip'
+      tooltip = document.createElement('div')
+      tooltip.id = 'seren-tooltip'
 
-    const logoEl = document.createElement('div')
-    logoEl.className = 'seren-logo'
-    logoEl.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 32 32" fill="none">
-        <path d="M16 2 A14 14 0 1 1 26.1 22" stroke="rgba(255,255,255,0.75)" stroke-width="2.5" stroke-linecap="round"/>
-        <circle cx="26.5" cy="23.5" r="2.5" fill="#5DCAA5"/>
-      </svg>
-      <span class="seren-logo-text">Seren</span>
-    `
-    tooltip.appendChild(logoEl)
+      const logoEl = document.createElement('div')
+      logoEl.className = 'seren-logo'
+      logoEl.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 32 32" fill="none">
+          <path d="M16 2 A14 14 0 1 1 26.1 22" stroke="rgba(255,255,255,0.75)" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="26.5" cy="23.5" r="2.5" fill="#5DCAA5"/>
+        </svg>
+        <span class="seren-logo-text">Seren</span>
+      `
+      tooltip.appendChild(logoEl)
 
-    ACTIONS.forEach((action, i) => {
-      if (i > 0) {
-        const divider = document.createElement('div')
-        divider.className = 'seren-divider'
-        tooltip.appendChild(divider)
-      }
+      tooltipCommands.forEach((cmd, i) => {
+        if (i > 0) {
+          const divider = document.createElement('div')
+          divider.className = 'seren-divider'
+          tooltip.appendChild(divider)
+        }
 
-      const btn = document.createElement('button')
-      btn.className = 'seren-action'
-      btn.dataset.action = action.id
-      btn.innerHTML = `${action.svg} ${action.label}`
+        const btn = document.createElement('button')
+        btn.className = 'seren-action'
+        btn.dataset.commandId = cmd.id
+        btn.textContent = cmd.label
 
-      btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation() })
-      btn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation()
-        handleAction(action.id, selectedText)
-        removeTooltip()
+        btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation() })
+        btn.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation()
+          handleAction(cmd, selectedText)
+          removeTooltip()
+        })
+
+        tooltip.appendChild(btn)
       })
 
-      tooltip.appendChild(btn)
+      document.body.appendChild(tooltip)
+
+      const tooltipRect = tooltip.getBoundingClientRect()
+      const scrollX = window.scrollX
+      const scrollY = window.scrollY
+      const margin = 8
+
+      let left = rect.left + scrollX + (rect.width / 2) - (tooltipRect.width / 2)
+      let top  = rect.top  + scrollY - tooltipRect.height - 10
+
+      if (left < margin) left = margin
+      if (left + tooltipRect.width > window.innerWidth - margin)
+        left = window.innerWidth - tooltipRect.width - margin
+      if (top < scrollY + margin)
+        top = rect.bottom + scrollY + 10
+
+      tooltip.style.left = `${left}px`
+      tooltip.style.top  = `${top}px`
     })
-
-    document.body.appendChild(tooltip)
-
-    const tooltipRect = tooltip.getBoundingClientRect()
-    const scrollX = window.scrollX
-    const scrollY = window.scrollY
-    const margin = 8
-
-    let left = rect.left + scrollX + (rect.width / 2) - (tooltipRect.width / 2)
-    let top  = rect.top  + scrollY - tooltipRect.height - 10
-
-    if (left < margin) left = margin
-    if (left + tooltipRect.width > window.innerWidth - margin)
-      left = window.innerWidth - tooltipRect.width - margin
-    if (top < scrollY + margin)
-      top = rect.bottom + scrollY + 10
-
-    tooltip.style.left = `${left}px`
-    tooltip.style.top  = `${top}px`
   }
 
   // ── Toast ─────────────────────────────────────────────────────
@@ -216,18 +226,20 @@
     removeToast()
     toast = document.createElement('div')
     toast.id = 'seren-toast'
-    toast.innerHTML = `<span class="seren-toast-dot"></span>Sent to Seren — click the icon to see the answer`
+    toast.innerHTML = `<span class="seren-toast-dot"></span>Opening Seren…`
     document.body.appendChild(toast)
     setTimeout(removeToast, 3500)
   }
 
   // ── Handle action ─────────────────────────────────────────────
+  // cmd = { id, label, prompt }, text = selected text
 
-  function handleAction(actionId, text) {
+  function handleAction(cmd, text) {
+    const fullPrompt = `${cmd.prompt}\n\n${text}`
     chrome.runtime.sendMessage({
       type: 'SEREN_CONTENT_ACTION',
-      action: actionId,
-      text: text
+      action: cmd.id,
+      promptText: fullPrompt
     }, () => { showToast() })
   }
 
@@ -283,5 +295,49 @@
   }
 
   syncAuth()
+
+  // ── Storage bridge for the Seren web app ───────────────────────
+  // Settings.tsx (a normal webpage on localhost:5173) can't access
+  // chrome.storage directly. It posts messages to window, we relay
+  // them to chrome.storage here (content scripts have access) and
+  // post the result back.
+  //
+  // Request:  { source: 'seren-web', type: 'SEREN_STORAGE_GET', key, requestId }
+  // Response: { source: 'seren-extension', type: 'SEREN_STORAGE_RESULT', requestId, value }
+  //
+  // Request:  { source: 'seren-web', type: 'SEREN_STORAGE_SET', key, value, requestId }
+  // Response: { source: 'seren-extension', type: 'SEREN_STORAGE_RESULT', requestId, ok: true }
+
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return
+    const msg = event.data
+    if (!msg || msg.source !== 'seren-web') return
+
+    if (msg.type === 'SEREN_STORAGE_GET' && msg.key) {
+      chrome.storage.local.get([msg.key], (res) => {
+        window.postMessage({
+          source: 'seren-extension',
+          type: 'SEREN_STORAGE_RESULT',
+          requestId: msg.requestId,
+          value: res[msg.key]
+        }, '*')
+      })
+    }
+
+    if (msg.type === 'SEREN_STORAGE_SET' && msg.key) {
+      chrome.storage.local.set({ [msg.key]: msg.value }, () => {
+        window.postMessage({
+          source: 'seren-extension',
+          type: 'SEREN_STORAGE_RESULT',
+          requestId: msg.requestId,
+          ok: true
+        }, '*')
+      })
+    }
+  })
+
+  // Let the web page know the extension is present (so it doesn't
+  // need to time out before falling back to localStorage).
+  window.postMessage({ source: 'seren-extension', type: 'SEREN_BRIDGE_READY' }, '*')
 
 })()

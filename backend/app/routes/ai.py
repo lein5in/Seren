@@ -57,6 +57,12 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
         ]
     }
 
+    from app.routes.upload import pdf_store
+    pdf_doc = pdf_store.get(request.user_id)
+    if pdf_doc : 
+        user_context["pdf_content"] = pdf_doc["content"]
+        user_context["pdf_filename"] = pdf_doc["filename"]
+
     history = [{"role": m.role, "content": m.content} for m in request.conversation_history]
 
     result = chat_with_seren(

@@ -8,7 +8,7 @@ export default function Hero() {
   function handleChromeBtn() {
     const stored = localStorage.getItem('seren_user')
     if (stored) {
-      navigate('/dashboard')
+      navigate('/chat')
     } else {
       navigate('/register')
     }
