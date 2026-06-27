@@ -17,7 +17,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://seren-blond.vercel.app"
+        "https://seren-blond.vercel.app",
+        "https://seren-git-main-habib-ibrahim-toures-projects.vercel.app/"
     ],
     allow_credentials=True,
     allow_methods=["*"],
