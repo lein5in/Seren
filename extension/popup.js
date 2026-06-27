@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8000'
+const API_BASE = "https://seren-production-834b.up.railway.app";
 
 const ACTION_PROMPTS = {
   'seren-solve':     (text) => `Solve or explain the following:\n\n${text}`,
