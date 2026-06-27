@@ -679,10 +679,10 @@ document.addEventListener('DOMContentLoaded', () => {
   })
 
   document.getElementById('btn-settings')?.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'http://localhost:5173/settings' })
+    chrome.tabs.create({ url: 'https://seren-blond.vercel.app/settings' })
   })
 
   document.getElementById('btn-settings-sidebar')?.addEventListener('click', () => {
-  chrome.tabs.create({ url: 'http://localhost:5173/settings' })
+  chrome.tabs.create({ url: 'https://seren-blond.vercel.app/settings' })
   })
 })
