@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = 'https://seren-production-834b.up.railway.app'
 
 function getDaysUntil(deadline: string) {
   const now = new Date()
