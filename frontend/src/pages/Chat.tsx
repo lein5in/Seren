@@ -237,6 +237,51 @@ export default function Chat() {
   const [streaming, setStreaming] = useState(false)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
+  const draggingRef = useRef<'opening' | 'closing' | null>(null)
+  const [dragX, setDragX] = useState<number | null>(null) // live px offset while finger is down, null = not dragging
+  const SIDEBAR_WIDTH = 260
+
+  // ── Swipe gesture — the sidebar follows the finger in real time,
+  // then snaps open/closed on release depending on how far it moved.
+  // Touch-only, so it's a no-op on desktop (no touch events fire there).
+  function handleTouchStart(e: React.TouchEvent) {
+    const x = e.touches[0].clientX
+    touchStartX.current = x
+    touchStartY.current = e.touches[0].clientY
+    if (!sidebarOpen && x < 40) draggingRef.current = 'opening'
+    else if (sidebarOpen) draggingRef.current = 'closing'
+    else draggingRef.current = null
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (!draggingRef.current || touchStartX.current === null) return
+    const deltaX = e.touches[0].clientX - touchStartX.current
+    if (draggingRef.current === 'opening') {
+      setDragX(Math.min(Math.max(deltaX, 0), SIDEBAR_WIDTH) - SIDEBAR_WIDTH) // -260 → 0
+    } else {
+      setDragX(Math.min(Math.max(deltaX, -SIDEBAR_WIDTH), 0)) // 0 → -260
+    }
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (!draggingRef.current || touchStartX.current === null) {
+      touchStartX.current = null; touchStartY.current = null; return
+    }
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current
+    const deltaY = e.changedTouches[0].clientY - (touchStartY.current ?? 0)
+    const wasOpening = draggingRef.current === 'opening'
+    draggingRef.current = null
+    touchStartX.current = null
+    touchStartY.current = null
+    setDragX(null) // let the CSS transition take over for the final snap
+
+    if (Math.abs(deltaY) > Math.abs(deltaX)) return // vertical scroll, ignore
+    const SWIPE_THRESHOLD = 60
+    if (wasOpening && deltaX > SWIPE_THRESHOLD) setSidebarOpen(true)
+    else if (!wasOpening && deltaX < -SWIPE_THRESHOLD) setSidebarOpen(false)
+  }
 
   // ── Dark mode ────────────────────────────────────────────────
   useEffect(() => {
@@ -476,15 +521,28 @@ export default function Chat() {
   if (!user) return null
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#F6F6F4] dark:bg-[#0B1210] transition-colors" style={{ fontFamily: 'DM Sans, system-ui, sans-serif' }}>
+    <div
+      className="flex h-screen w-screen overflow-hidden bg-[#F6F6F4] dark:bg-[#0B1210] transition-colors"
+      style={{ fontFamily: 'DM Sans, system-ui, sans-serif' }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
 
-      {/* Mobile backdrop — closes sidebar on tap outside */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
+      {/* Mobile backdrop — closes sidebar on tap outside, fades in live while dragging */}
+      {(sidebarOpen || (dragX !== null && dragX > -SIDEBAR_WIDTH)) && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          style={dragX !== null ? { opacity: (dragX + SIDEBAR_WIDTH) / SIDEBAR_WIDTH, transition: 'none' } : undefined}
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
 
       {/* ── SIDEBAR ── */}
-      <aside className={`w-[260px] min-w-[260px] h-full bg-[#04342C] flex flex-col overflow-hidden fixed md:static inset-y-0 left-0 z-40 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+      <aside
+        className={`w-[260px] min-w-[260px] h-full bg-[#04342C] flex flex-col overflow-hidden fixed md:static inset-y-0 left-0 z-40 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
+        style={dragX !== null ? { transform: `translateX(${dragX}px)`, transition: 'none' } : undefined}
+      >
 
         {/* Logo */}
         <div className="px-5 pt-5 pb-4 flex items-center justify-between border-b border-white/10">
