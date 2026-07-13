@@ -8,7 +8,7 @@ load_dotenv()
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-sonnet-5"
 
 SEREN_SYSTEM_PROMPT = """
 You are Seren, a smart and caring study companion for university students.
@@ -190,12 +190,72 @@ Current user context:
 
     response = client.messages.create(
         model=MODEL,
-        max_tokens=1000,
+        max_tokens=2048,
         system=system,
         messages=messages
     )
 
     return {"type": "text", "content": response.content[0].text}
+
+
+def stream_chat_with_seren(
+    user_message: str,
+    conversation_history: list,
+    user_context: Optional[dict] = None
+):
+    """
+    Generator yielding Server-Sent Events (SSE) strings.
+
+    - flashcards / quiz / visual: generated the same way as before (they're
+      structured JSON/HTML, not natural language, so streaming token-by-token
+      wouldn't make sense) — yielded as a single 'complete' event.
+    - regular text: streamed token-by-token as Claude generates it, via
+      client.messages.stream(), then a final 'done' event.
+    """
+    message_type = detect_message_type(user_message)
+
+    if message_type in ('flashcard', 'quiz', 'visual'):
+        result = chat_with_seren(user_message, conversation_history, user_context)
+        payload = json.dumps({"event": "complete", "type": result["type"], "data": result["content"]})
+        yield f"data: {payload}\n\n"
+        return
+
+    context_block = ""
+    if user_context:
+        name = user_context.get("name", "the student")
+        events = user_context.get("events", [])
+        context_block = f"\nCurrent user context:\n- Name: {name}\n- Upcoming deadlines: {len(events)} in the next 7 days\n"
+        if events:
+            context_block += "- Next deadlines:\n"
+            for e in events[:3]:
+                context_block += f"  • {e['title']} — {e['deadline']}\n"
+
+    pdf_block = ""
+    if user_context and user_context.get("pdf_content"):
+        pdf_block = f"\n\nThe user has uploaded a document called \"{user_context.get('pdf_filename', 'document.pdf')}\". Here is its content:\n\n{user_context['pdf_content']}\n\nThis document is available for the entire conversation. Use it to answer any question, even if the user doesn't explicitly mention the filename."
+
+    system = SEREN_SYSTEM_PROMPT + pdf_block
+    if context_block:
+        system += f"\n\n{context_block}"
+
+    messages = conversation_history + [{"role": "user", "content": user_message}]
+
+    try:
+        with client.messages.stream(
+            model=MODEL,
+            max_tokens=2048,
+            system=system,
+            messages=messages
+        ) as stream:
+            for text in stream.text_stream:
+                payload = json.dumps({"event": "token", "text": text})
+                yield f"data: {payload}\n\n"
+    except Exception as e:
+        payload = json.dumps({"event": "error", "message": "Something went wrong while generating the response."})
+        yield f"data: {payload}\n\n"
+        return
+
+    yield f"data: {json.dumps({'event': 'done'})}\n\n"
 
 
 def get_onboarding_message(step: int, user_name: str) -> str:

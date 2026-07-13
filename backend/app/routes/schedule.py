@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db, EventDB
 from app.models.event import EventResponse, EventType, Priority
+from app.auth import get_current_user_id, require_self
 from typing import List
 from datetime import datetime
 import re
@@ -93,10 +94,12 @@ def detect_priority(event_type: EventType) -> Priority:
 # ========================
 
 @router.post("/import/{user_id}", response_model=List[EventResponse])
-async def import_ics(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def import_ics(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
     """
     Import a .ics file and save all events for a user.
     """
+    require_self(user_id, current_user_id)
+
     if not file.filename.endswith(".ics"):
         raise HTTPException(status_code=400, detail="Only .ics files are supported")
 
@@ -133,11 +136,13 @@ async def import_ics(user_id: int, file: UploadFile = File(...), db: Session = D
 
 
 @router.get("/summary/{user_id}")
-def get_schedule_summary(user_id: int, db: Session = Depends(get_db)):
+def get_schedule_summary(user_id: int, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
     """
     Returns a calm summary of upcoming events for the user.
     Used to feed the AI for caring responses.
     """
+    require_self(user_id, current_user_id)
+
     from datetime import timedelta
     now = datetime.utcnow()
     next_week = now + timedelta(days=7)

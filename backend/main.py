@@ -13,9 +13,22 @@ app = FastAPI(
 # ========================
 # CORS Middleware
 # ========================
+# Explicit allow-list instead of "*". Wildcard origins combined with
+# allow_credentials=True is both rejected by modern browsers and a
+# security risk (any site could call the API using a logged-in user's
+# cookies/token if it were ever sent that way).
+#
+# Add new frontend URLs here as they're deployed (e.g. a new Vercel
+# preview URL, or the final production domain).
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",              # local dev
+    "https://seren-blond.vercel.app",     # beta frontend
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://seren-.*\.vercel\.app",  # Vercel preview deployments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

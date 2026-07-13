@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db, EventDB
 from app.models.event import EventCreate, EventResponse, Priority
+from app.auth import get_current_user_id, require_self
 from typing import List
 from datetime import datetime, timedelta
 
@@ -10,15 +11,26 @@ router = APIRouter(
     tags=["Events"]
 )
 
+def get_owned_event(event_id: int, current_user_id: int, db: Session) -> EventDB:
+    """Fetch an event and confirm the current user owns it, or raise 404/403."""
+    event = db.query(EventDB).filter(EventDB.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this event")
+    return event
+
 # ========================
 # Routes
 # ========================
 
 @router.post("/", response_model=EventResponse)
-def create_event(event: EventCreate, db: Session = Depends(get_db)):
+def create_event(event: EventCreate, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
     """
-    Create a new event / deadline.
+    Create a new event / deadline. The event is always created for the
+    authenticated user — the user_id in the body must match the token.
     """
+    require_self(event.user_id, current_user_id)
     new_event = EventDB(
         title=event.title,
         description=event.description,
@@ -35,10 +47,11 @@ def create_event(event: EventCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/user/{user_id}", response_model=List[EventResponse])
-def get_user_events(user_id: int, db: Session = Depends(get_db)):
+def get_user_events(user_id: int, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
     """
     Get all events for a user, ordered by deadline.
     """
+    require_self(user_id, current_user_id)
     events = (
         db.query(EventDB)
         .filter(EventDB.user_id == user_id)
@@ -49,10 +62,11 @@ def get_user_events(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/user/{user_id}/upcoming", response_model=List[EventResponse])
-def get_upcoming_events(user_id: int, days: int = 7, db: Session = Depends(get_db)):
+def get_upcoming_events(user_id: int, days: int = 7, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
     """
     Get events due within the next X days (default: 7).
     """
+    require_self(user_id, current_user_id)
     now = datetime.utcnow()
     future = now + timedelta(days=days)
     events = (
@@ -67,10 +81,11 @@ def get_upcoming_events(user_id: int, days: int = 7, db: Session = Depends(get_d
 
 
 @router.get("/user/{user_id}/reminders", response_model=List[EventResponse])
-def get_events_needing_reminders(user_id: int, reminder_days: int = 3, db: Session = Depends(get_db)):
+def get_events_needing_reminders(user_id: int, reminder_days: int = 3, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
     """
     Get events whose deadline is within reminder_days and reminder not yet sent.
     """
+    require_self(user_id, current_user_id)
     now = datetime.utcnow()
     reminder_threshold = now + timedelta(days=reminder_days)
     events = (
@@ -85,13 +100,11 @@ def get_events_needing_reminders(user_id: int, reminder_days: int = 3, db: Sessi
 
 
 @router.put("/{event_id}", response_model=EventResponse)
-def update_event(event_id: int, event: EventCreate, db: Session = Depends(get_db)):
+def update_event(event_id: int, event: EventCreate, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
     """
-    Update an existing event.
+    Update an existing event. Only the owner can update it.
     """
-    db_event = db.query(EventDB).filter(EventDB.id == event_id).first()
-    if not db_event:
-        raise HTTPException(status_code=404, detail="Event not found")
+    db_event = get_owned_event(event_id, current_user_id, db)
 
     db_event.title = event.title
     db_event.description = event.description
@@ -106,14 +119,11 @@ def update_event(event_id: int, event: EventCreate, db: Session = Depends(get_db
 
 
 @router.delete("/{event_id}")
-def delete_event(event_id: int, db: Session = Depends(get_db)):
+def delete_event(event_id: int, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
     """
-    Delete an event.
+    Delete an event. Only the owner can delete it.
     """
-    db_event = db.query(EventDB).filter(EventDB.id == event_id).first()
-    if not db_event:
-        raise HTTPException(status_code=404, detail="Event not found")
-
+    db_event = get_owned_event(event_id, current_user_id, db)
     db.delete(db_event)
     db.commit()
     return {"message": "Event deleted successfully"}

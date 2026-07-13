@@ -2,6 +2,7 @@ import pdfplumber
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db, UserDB
+from app.auth import get_current_user_id, require_self
 import io
 
 router = APIRouter(prefix="/upload", tags=["Upload"])
@@ -10,7 +11,9 @@ router = APIRouter(prefix="/upload", tags=["Upload"])
 pdf_store = {}
 
 @router.post("/pdf/{user_id}")
-async def upload_pdf(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_pdf(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
+    require_self(user_id, current_user_id)
+
     user = db.query(UserDB).filter(UserDB.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -38,7 +41,8 @@ async def upload_pdf(user_id: int, file: UploadFile = File(...), db: Session = D
 
 
 @router.get("/pdf/{user_id}")
-def get_pdf_context(user_id: int):
+def get_pdf_context(user_id: int, current_user_id: int = Depends(get_current_user_id)):
+    require_self(user_id, current_user_id)
     doc = pdf_store.get(user_id)
     if not doc:
         return {"content": None}

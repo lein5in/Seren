@@ -67,8 +67,15 @@ class UserDB(Base):
     productive_hours_end = Column(Integer, default=17)
     max_daily_tasks = Column(Integer, default=5)
 
-    # Relationship
-    events = relationship("EventDB", back_populates="user")
+    # Relationship — cascade="all, delete-orphan" means deleting a user
+    # via the ORM (db.delete(user)) also deletes all their events.
+    # Fixes the known "delete account doesn't really delete everything" bug.
+    events = relationship(
+        "EventDB",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 class EventDB(Base):
     __tablename__ = "events"
@@ -83,8 +90,9 @@ class EventDB(Base):
     reminder_sent = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Foreign key
-    user_id = Column(Integer, ForeignKey("users.id"))
+    # Foreign key — ondelete="CASCADE" backs up the ORM-level cascade above
+    # at the database level too (belt and suspenders).
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     user = relationship("UserDB", back_populates="events")
 
 # ========================

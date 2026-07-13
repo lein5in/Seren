@@ -232,6 +232,17 @@ export default function Chat() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [attachedFile, setAttachedFile] = useState<string | null>(null) // chip in input bar
   const [customCommands, setCustomCommands] = useState<CustomCommand[]>([])
+  const [darkMode, setDarkMode] = useState<boolean>(() => localStorage.getItem('seren_dark') === '1')
+  const [sidebarOpen, setSidebarOpen] = useState(false) // mobile overlay sidebar
+  const [streaming, setStreaming] = useState(false)
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  // ── Dark mode ────────────────────────────────────────────────
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode)
+    localStorage.setItem('seren_dark', darkMode ? '1' : '0')
+  }, [darkMode])
 
   // ── Load user ─────────────────────────────────────────────────
   useEffect(() => {
@@ -322,41 +333,108 @@ export default function Chat() {
     })
   }
 
-  // ── Send message ──────────────────────────────────────────────
-  async function sendMessage(text: string) {
+  // ── Send message (streamed via SSE) ─────────────────────────────
+  async function sendMessage(text: string, opts?: { skipUserMessage?: boolean; historyOverride?: Message[] }) {
     if (!text.trim() || !user) return
-    setMessages(prev => [...prev, { role: 'user', type: 'text', content: text }])
+    if (!opts?.skipUserMessage) {
+      setMessages(prev => [...prev, { role: 'user', type: 'text', content: text }])
+    }
     setInput('')
     setAttachedFile(null)
     setLoading(true)
+    setStreaming(true)
 
     const token = localStorage.getItem('seren_token')
-    const history = messages
+    const sourceMessages = opts?.historyOverride ?? messages
+    const history = sourceMessages
       .filter(m => m.type === 'text' && m.content)
       .map(m => ({ role: m.role === 'seren' ? 'assistant' : 'user', content: m.content }))
 
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    // Placeholder message that fills in as tokens arrive
+    let assistantIndex = -1
+    setMessages(prev => {
+      assistantIndex = prev.length
+      return [...prev, { role: 'seren', type: 'text', content: '' }]
+    })
+
+    let accumulated = ''
+
     try {
-      const res = await fetch(`${API_BASE}/ai/chat`, {
+      const res = await fetch(`${API_BASE}/ai/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: text, user_id: user.id, conversation_history: history })
+        body: JSON.stringify({ message: text, user_id: user.id, conversation_history: history }),
+        signal: controller.signal
       })
-      const data = await res.json()
-      setLoading(false)
 
-      if (data.type === 'flashcards' && data.data) {
-        setMessages(prev => [...prev, { role: 'seren', type: 'flashcards', content: '', data: data.data }])
-      } else if (data.type === 'quiz' && data.data) {
-        setMessages(prev => [...prev, { role: 'seren', type: 'quiz', content: '', data: data.data }])
-      } else if (data.type === 'visual' && data.data) {
-        setMessages(prev => [...prev, { role: 'seren', type: 'visual', content: '', data: data.data }])
-      } else {
-        setMessages(prev => [...prev, { role: 'seren', type: 'text', content: data.reply || 'Something went wrong.' }])
+      if (!res.ok || !res.body) throw new Error('Stream failed')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      setLoading(false) // tokens are arriving — drop the "..." loading dots
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const events = buffer.split('\n\n')
+        buffer = events.pop() || ''
+
+        for (const raw of events) {
+          if (!raw.startsWith('data: ')) continue
+          const json = JSON.parse(raw.slice(6))
+
+          if (json.event === 'token') {
+            accumulated += json.text
+            const snapshot = accumulated
+            setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: snapshot } : m))
+          } else if (json.event === 'complete') {
+            setMessages(prev => prev.map((m, i) => i === assistantIndex
+              ? { role: 'seren', type: json.type, content: '', data: json.data }
+              : m))
+          } else if (json.event === 'error') {
+            setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: json.message || 'Something went wrong.' } : m))
+          }
+        }
       }
-    } catch {
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        // User hit stop — keep whatever text streamed in so far
+        if (!accumulated) {
+          setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: '_(stopped)_' } : m))
+        }
+      } else {
+        setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: 'Could not reach Seren. Is the backend running?' } : m))
+      }
+    } finally {
       setLoading(false)
-      setMessages(prev => [...prev, { role: 'seren', type: 'text', content: 'Could not reach Seren. Is the backend running?' }])
+      setStreaming(false)
+      abortControllerRef.current = null
     }
+  }
+
+  function stopGeneration() {
+    abortControllerRef.current?.abort()
+  }
+
+  function regenerate() {
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
+    if (!lastUserMsg) return
+    const idx = messages.map(m => m.role).lastIndexOf('user')
+    const trimmed = idx >= 0 ? messages.slice(0, idx + 1) : messages
+    setMessages(trimmed)
+    sendMessage(lastUserMsg.content, { skipUserMessage: true, historyOverride: trimmed.slice(0, -1) })
+  }
+
+  function copyMessage(text: string, index: number) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedIndex(index)
+      setTimeout(() => setCopiedIndex(i => (i === index ? null : i)), 1500)
+    })
   }
 
   // ── File upload → chip in input bar ──────────────────────────
@@ -398,21 +476,34 @@ export default function Chat() {
   if (!user) return null
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#F6F6F4]" style={{ fontFamily: 'DM Sans, system-ui, sans-serif' }}>
+    <div className="flex h-screen w-screen overflow-hidden bg-[#F6F6F4] dark:bg-[#0B1210] transition-colors" style={{ fontFamily: 'DM Sans, system-ui, sans-serif' }}>
+
+      {/* Mobile backdrop — closes sidebar on tap outside */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
 
       {/* ── SIDEBAR ── */}
-      <aside className="w-[260px] min-w-[260px] h-full bg-[#04342C] flex flex-col overflow-hidden">
+      <aside className={`w-[260px] min-w-[260px] h-full bg-[#04342C] flex flex-col overflow-hidden fixed md:static inset-y-0 left-0 z-40 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
 
         {/* Logo */}
-        <div className="px-5 pt-5 pb-4 flex items-center gap-2.5 border-b border-white/10">
-          <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
-            <path d="M16 2 A14 14 0 1 1 26.1 22" stroke="rgba(255,255,255,0.85)" strokeWidth="2.2" strokeLinecap="round"/>
-            <circle cx="26.5" cy="23.5" r="2.5" fill="#5DCAA5"/>
-            <line x1="10" y1="13" x2="22" y2="13" stroke="rgba(255,255,255,0.8)" strokeWidth="1.7" strokeLinecap="round"/>
-            <line x1="9"  y1="18" x2="23" y2="18" stroke="rgba(255,255,255,0.5)" strokeWidth="1.7" strokeLinecap="round"/>
-            <line x1="10" y1="23" x2="22" y2="23" stroke="rgba(255,255,255,0.25)" strokeWidth="1.7" strokeLinecap="round"/>
-          </svg>
-          <span style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[18px] text-white font-normal">Seren</span>
+        <div className="px-5 pt-5 pb-4 flex items-center justify-between border-b border-white/10">
+          <div className="flex items-center gap-2.5">
+            <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
+              <path d="M16 2 A14 14 0 1 1 26.1 22" stroke="rgba(255,255,255,0.85)" strokeWidth="2.2" strokeLinecap="round"/>
+              <circle cx="26.5" cy="23.5" r="2.5" fill="#5DCAA5"/>
+              <line x1="10" y1="13" x2="22" y2="13" stroke="rgba(255,255,255,0.8)" strokeWidth="1.7" strokeLinecap="round"/>
+              <line x1="9"  y1="18" x2="23" y2="18" stroke="rgba(255,255,255,0.5)" strokeWidth="1.7" strokeLinecap="round"/>
+              <line x1="10" y1="23" x2="22" y2="23" stroke="rgba(255,255,255,0.25)" strokeWidth="1.7" strokeLinecap="round"/>
+            </svg>
+            <span style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[18px] text-white font-normal">Seren</span>
+          </div>
+          <button onClick={() => setSidebarOpen(false)}
+            className="md:hidden text-white/50 hover:text-white/90 bg-transparent border-none cursor-pointer p-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
 
         {/* Greeting */}
@@ -474,6 +565,19 @@ export default function Chat() {
 
         {/* Footer */}
         <div className="px-4 py-4 border-t border-white/10 flex flex-col gap-1">
+          <button onClick={() => setDarkMode(d => !d)}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-white/45 hover:text-white/80 hover:bg-white/07 transition-all cursor-pointer border-none bg-transparent w-full text-left">
+            {darkMode ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              </svg>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+            )}
+            {darkMode ? 'Light mode' : 'Dark mode'}
+          </button>
           <Link to="/settings"
             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-white/45 hover:text-white/80 hover:bg-white/07 transition-all no-underline">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -495,14 +599,22 @@ export default function Chat() {
       {/* ── MAIN ── */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
 
-        {/* Header — minimal, no file chip here anymore */}
-        <header className="h-[56px] flex items-center justify-end px-6 border-b border-[#EEEEEC] bg-white flex-shrink-0">
-          <p className="text-xs text-[#AEADA8]">Seren · your study companion</p>
+        {/* Header */}
+        <header className="h-[56px] flex items-center justify-between px-4 md:px-6 border-b border-[#EEEEEC] dark:border-white/10 bg-white dark:bg-[#0F1A17] flex-shrink-0 transition-colors">
+          <button onClick={() => setSidebarOpen(true)}
+            className="md:hidden text-[#88877F] dark:text-white/50 hover:text-[#2C2C2A] dark:hover:text-white bg-transparent border-none cursor-pointer p-1">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
+          <p className="text-xs text-[#AEADA8] dark:text-white/30 ml-auto">Seren · your study companion</p>
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-4">
-          {messages.map((msg, i) => (
+        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 flex flex-col gap-4">
+          {messages.map((msg, i) => {
+            const isLastSeren = msg.role === 'seren' && i === messages.length - 1
+            return (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {msg.type === 'flashcards' && msg.data ? (
                 <div className="w-full max-w-[520px]"><FlashcardsBlock data={msg.data} /></div>
@@ -511,10 +623,11 @@ export default function Chat() {
               ) : msg.type === 'visual' && msg.data ? (
                 <VisualBlock html={msg.data} />
               ) : (
-                <div className={`max-w-[65%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                <div className="flex flex-col gap-1 max-w-[80%] md:max-w-[65%]">
+                <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed transition-colors ${
                   msg.role === 'user'
                     ? 'bg-[#085041] text-white rounded-br-sm'
-                    : 'bg-white border border-[#EEEEEC] text-[#2C2C2A] rounded-bl-sm'
+                    : 'bg-white dark:bg-[#141F1C] border border-[#EEEEEC] dark:border-white/10 text-[#2C2C2A] dark:text-white/90 rounded-bl-sm'
                 }`}>
                   {msg.role === 'seren' ? (
                     <>
@@ -535,13 +648,35 @@ export default function Chat() {
                     <p>{msg.content}</p>
                   )}
                 </div>
+                {msg.role === 'seren' && msg.content && (
+                  <div className="flex items-center gap-3 px-1">
+                    <button onClick={() => copyMessage(msg.content, i)}
+                      className="flex items-center gap-1 text-[10px] text-[#AEADA8] dark:text-white/30 hover:text-[#0F6E56] dark:hover:text-[#5DCAA5] transition-colors bg-transparent border-none cursor-pointer px-0 font-sans">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                      </svg>
+                      {copiedIndex === i ? 'Copied' : 'Copy'}
+                    </button>
+                    {isLastSeren && !streaming && (
+                      <button onClick={regenerate}
+                        className="flex items-center gap-1 text-[10px] text-[#AEADA8] dark:text-white/30 hover:text-[#0F6E56] dark:hover:text-[#5DCAA5] transition-colors bg-transparent border-none cursor-pointer px-0 font-sans">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        Regenerate
+                      </button>
+                    )}
+                  </div>
+                )}
+                </div>
               )}
             </div>
-          ))}
+          )})}
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-white border border-[#EEEEEC] rounded-2xl rounded-bl-sm px-4 py-3">
+              <div className="bg-white dark:bg-[#141F1C] border border-[#EEEEEC] dark:border-white/10 rounded-2xl rounded-bl-sm px-4 py-3">
                 <div className="flex gap-1 items-center">
                   {[0, 1, 2].map(i => (
                     <span key={i} className="w-1.5 h-1.5 bg-[#5DCAA5] rounded-full opacity-40 animate-bounce"
@@ -555,7 +690,7 @@ export default function Chat() {
         </div>
 
         {/* Input zone — chip lives here */}
-        <div className="border-t border-[#EEEEEC] bg-white flex-shrink-0">
+        <div className="border-t border-[#EEEEEC] dark:border-white/10 bg-white dark:bg-[#0F1A17] flex-shrink-0 transition-colors">
 
           {/* File chip — shown inside input zone when file attached */}
           {attachedFile && (
@@ -572,12 +707,12 @@ export default function Chat() {
             </div>
           )}
 
-          <div className="px-6 py-4">
-            <div className="flex items-center gap-3 bg-[#F6F6F4] border border-[#EEEEEC] rounded-2xl px-4 py-3 focus-within:border-[#5DCAA5] transition-colors">
+          <div className="px-4 md:px-6 py-4">
+            <div className="flex items-center gap-3 bg-[#F6F6F4] dark:bg-[#1A2622] border border-[#EEEEEC] dark:border-white/10 rounded-2xl px-4 py-3 focus-within:border-[#5DCAA5] transition-colors">
               <input type="file" ref={fileInputRef} accept=".pdf" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = '' }} />
               <button onClick={() => fileInputRef.current?.click()}
-                className="text-[#AEADA8] hover:text-[#0F6E56] transition-colors bg-transparent border-none cursor-pointer p-0 flex-shrink-0"
+                className="text-[#AEADA8] dark:text-white/30 hover:text-[#0F6E56] dark:hover:text-[#5DCAA5] transition-colors bg-transparent border-none cursor-pointer p-0 flex-shrink-0"
                 title="Upload PDF">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -588,18 +723,26 @@ export default function Chat() {
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input) } }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !streaming) { e.preventDefault(); sendMessage(input) } }}
                 placeholder="Ask Seren anything…"
-                className="flex-1 bg-transparent border-none outline-none text-sm text-[#2C2C2A] placeholder-[#AEADA8] font-sans"
+                className="flex-1 bg-transparent border-none outline-none text-sm text-[#2C2C2A] dark:text-white/90 placeholder-[#AEADA8] dark:placeholder-white/25 font-sans"
               />
-              <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading}
-                className="w-8 h-8 bg-[#0F6E56] hover:bg-[#085041] disabled:opacity-40 text-white rounded-xl border-none cursor-pointer flex items-center justify-center flex-shrink-0 transition-all">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                </svg>
-              </button>
+              {streaming ? (
+                <button onClick={stopGeneration}
+                  className="w-8 h-8 bg-[#2C2C2A] dark:bg-white/15 hover:bg-black text-white rounded-xl border-none cursor-pointer flex items-center justify-center flex-shrink-0 transition-all"
+                  title="Stop generating">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                </button>
+              ) : (
+                <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading}
+                  className="w-8 h-8 bg-[#0F6E56] hover:bg-[#085041] disabled:opacity-40 text-white rounded-xl border-none cursor-pointer flex items-center justify-center flex-shrink-0 transition-all">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                </button>
+              )}
             </div>
-            <p className="text-center text-[10px] text-[#AEADA8] mt-2">Seren can make mistakes. Always verify important information.</p>
+            <p className="text-center text-[10px] text-[#AEADA8] dark:text-white/25 mt-2">Seren can make mistakes. Always verify important information.</p>
           </div>
         </div>
       </main>

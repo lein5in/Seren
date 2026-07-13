@@ -237,8 +237,12 @@ export default function Settings() {
   async function handleDelete() {
     if (!user) return
     setDeleting(true)
+    const token = localStorage.getItem('seren_token')
     try {
-      await fetch(`${API_BASE}/users/${user.id}`, { method: 'DELETE' })
+      await fetch(`${API_BASE}/users/${user.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
     } catch {}
     localStorage.removeItem('seren_token')
     localStorage.removeItem('seren_user')
