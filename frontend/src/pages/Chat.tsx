@@ -352,6 +352,30 @@ export default function Chat() {
     navigate('/')
   }
 
+  // ── Edit a past user message ────────────────────────────────────
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
+
+  function startEdit(i: number, currentText: string) {
+    setEditingIndex(i)
+    setEditText(currentText)
+  }
+
+  function cancelEdit() {
+    setEditingIndex(null)
+    setEditText('')
+  }
+
+  function submitEdit() {
+    if (editingIndex === null || !editText.trim()) return
+    const trimmedHistory = messages.slice(0, editingIndex)
+    setMessages(trimmedHistory)
+    const newText = editText
+    setEditingIndex(null)
+    setEditText('')
+    sendMessage(newText, { historyOverride: trimmedHistory })
+  }
+
   // ── Paste into input ──────────────────────────────────────────
   function pasteIntoInput(text: string) {
     setInput(text)
@@ -680,8 +704,32 @@ export default function Chat() {
                 <div className="w-full max-w-[520px]"><QuizBlock data={msg.data} /></div>
               ) : msg.type === 'visual' && msg.data ? (
                 <VisualBlock html={msg.data} />
+              ) : msg.role === 'user' && editingIndex === i ? (
+                <div className="w-full max-w-[80%] md:max-w-[65%] flex flex-col gap-2">
+                  <textarea
+                    value={editText}
+                    onChange={e => setEditText(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitEdit() }
+                      if (e.key === 'Escape') cancelEdit()
+                    }}
+                    autoFocus
+                    rows={Math.min(6, Math.max(2, editText.split('\n').length))}
+                    className="w-full px-4 py-3 rounded-2xl text-sm leading-relaxed bg-[#085041] text-white border border-[#5DCAA5]/50 outline-none resize-none font-sans"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button onClick={cancelEdit}
+                      className="px-3 py-1.5 text-xs text-[#88877F] dark:text-white/40 hover:text-[#2C2C2A] dark:hover:text-white bg-transparent border-none cursor-pointer font-sans">
+                      Cancel
+                    </button>
+                    <button onClick={submitEdit} disabled={!editText.trim()}
+                      className="px-3 py-1.5 text-xs bg-[#0F6E56] hover:bg-[#085041] disabled:opacity-40 text-white rounded-lg border-none cursor-pointer font-sans">
+                      Save & submit
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <div className="flex flex-col gap-1 max-w-[80%] md:max-w-[65%]">
+                <div className={`flex flex-col gap-1 max-w-[80%] md:max-w-[65%] ${msg.role === 'user' ? 'items-end' : ''}`}>
                 <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed transition-colors ${
                   msg.role === 'user'
                     ? 'bg-[#085041] text-white rounded-br-sm'
@@ -703,9 +751,19 @@ export default function Chat() {
                       )}
                     </>
                   ) : (
-                    <p>{msg.content}</p>
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
                   )}
                 </div>
+                {msg.role === 'user' && !streaming && (
+                  <button onClick={() => startEdit(i, msg.content)}
+                    className="flex items-center gap-1 text-[10px] text-[#AEADA8] dark:text-white/30 hover:text-[#0F6E56] dark:hover:text-[#5DCAA5] transition-colors bg-transparent border-none cursor-pointer px-1 font-sans">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Edit
+                  </button>
+                )}
                 {msg.role === 'seren' && msg.content && (
                   <div className="flex items-center gap-3 px-1">
                     <button onClick={() => copyMessage(msg.content, i)}

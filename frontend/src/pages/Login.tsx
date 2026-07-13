@@ -93,7 +93,7 @@ export default function Login() {
       </div>
 
       {/* RIGHT PANEL */}
-      <div className="flex-1 flex flex-col items-center justify-center px-8 bg-[#F8F8F6]">
+      <div className="flex-1 flex flex-col items-center justify-center px-8 bg-[#F8F8F6] dark:bg-[#0B1210] transition-colors">
 
         {/* Mobile logo */}
         <Link to="/" className="flex lg:hidden items-center gap-2 no-underline mb-10">
@@ -104,35 +104,35 @@ export default function Login() {
             <line x1="9" y1="18" x2="23" y2="18" stroke="#1D9E75" strokeWidth="1.8" strokeLinecap="round" opacity="0.5"/>
             <line x1="10" y1="23" x2="22" y2="23" stroke="#1D9E75" strokeWidth="1.8" strokeLinecap="round" opacity="0.3"/>
           </svg>
-          <span style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[22px] text-[#0F6E56] tracking-wide">Seren</span>
+          <span style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[22px] text-[#0F6E56] dark:text-white tracking-wide">Seren</span>
         </Link>
 
         <div className="w-full max-w-[400px]">
-          <h1 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[32px] text-[#04342C] font-normal mb-1">Log in</h1>
-          <p className="text-sm text-[#88877F] mb-8">Good to see you again.</p>
+          <h1 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[32px] text-[#04342C] dark:text-white font-normal mb-1">Log in</h1>
+          <p className="text-sm text-[#88877F] dark:text-white/40 mb-8">Good to see you again.</p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#4A4A47] uppercase tracking-widest">Email</label>
+              <label className="text-xs font-semibold text-[#4A4A47] dark:text-white/50 uppercase tracking-widest">Email</label>
               <input
                 type="email" value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="you@university.edu" required
-                className="w-full px-4 py-3.5 rounded-xl border border-[#E1F5EE] bg-white text-sm text-[#2C2C2A] outline-none focus:border-[#0F6E56] focus:ring-2 focus:ring-[#0F6E56]/10 transition-all font-sans shadow-sm"
+                className="w-full px-4 py-3.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-white dark:bg-[#141F1C] text-sm text-[#2C2C2A] dark:text-white/90 outline-none focus:border-[#0F6E56] focus:ring-2 focus:ring-[#0F6E56]/10 transition-all font-sans shadow-sm"
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-[#4A4A47] uppercase tracking-widest">Password</label>
+                <label className="text-xs font-semibold text-[#4A4A47] dark:text-white/50 uppercase tracking-widest">Password</label>
               </div>
               <input
                 type="password" value={password} onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••" required
-                className="w-full px-4 py-3.5 rounded-xl border border-[#E1F5EE] bg-white text-sm text-[#2C2C2A] outline-none focus:border-[#0F6E56] focus:ring-2 focus:ring-[#0F6E56]/10 transition-all font-sans shadow-sm"
+                className="w-full px-4 py-3.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-white dark:bg-[#141F1C] text-sm text-[#2C2C2A] dark:text-white/90 outline-none focus:border-[#0F6E56] focus:ring-2 focus:ring-[#0F6E56]/10 transition-all font-sans shadow-sm"
               />
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 px-4 py-3 rounded-xl">
+              <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 px-4 py-3 rounded-xl">
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>
                 {error}
               </div>
@@ -152,14 +152,14 @@ export default function Login() {
           </form>
 
           <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-[#E1F5EE]" />
-            <span className="text-xs text-[#88877F]">or</span>
-            <div className="flex-1 h-px bg-[#E1F5EE]" />
+            <div className="flex-1 h-px bg-[#E1F5EE] dark:bg-white/10" />
+            <span className="text-xs text-[#88877F] dark:text-white/30">or</span>
+            <div className="flex-1 h-px bg-[#E1F5EE] dark:bg-white/10" />
           </div>
 
-          <p className="text-sm text-[#88877F] text-center">
+          <p className="text-sm text-[#88877F] dark:text-white/40 text-center">
             No account yet?{' '}
-            <Link to="/register" className="text-[#0F6E56] font-semibold no-underline hover:underline">
+            <Link to="/register" className="text-[#0F6E56] dark:text-[#5DCAA5] font-semibold no-underline hover:underline">
               Create one — it's free
             </Link>
           </p>

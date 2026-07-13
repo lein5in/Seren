@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useLang } from '../context/LangContext'
 
 interface Plan {
@@ -101,7 +102,17 @@ const plans: Plan[] = [
 
 export default function Pricing() {
   const { lang, t } = useLang()
+  const navigate = useNavigate()
   const sectionRef = useRef<HTMLDivElement>(null)
+
+  function handlePlanClick() {
+    const stored = localStorage.getItem('seren_user')
+    if (stored) {
+      navigate('/chat')
+    } else {
+      navigate('/register')
+    }
+  }
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -177,7 +188,7 @@ export default function Pricing() {
                 ))}
               </ul>
 
-              <button className={`w-full py-3.5 rounded-full text-sm font-medium cursor-pointer font-body transition-all duration-200
+              <button onClick={handlePlanClick} className={`w-full py-3.5 rounded-full text-sm font-medium cursor-pointer font-body transition-all duration-200
                 ${plan.featured
                   ? 'bg-white text-[#0F6E56] border-none hover:bg-[#E1F5EE]'
                   : 'bg-[#E1F5EE] text-[#0F6E56] border border-[#9FE1CB] hover:bg-[#9FE1CB]/30'

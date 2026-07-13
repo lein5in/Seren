@@ -336,9 +336,9 @@ export default function Settings() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-[#F6F6F4]">
+    <div className="min-h-screen bg-[#F6F6F4] dark:bg-[#0B1210] transition-colors">
 
-      <nav className="bg-white border-b border-[#E1F5EE] px-6 h-[64px] flex items-center justify-between sticky top-0 z-40">
+      <nav className="bg-white dark:bg-[#141F1C] border-b border-[#E1F5EE] dark:border-white/10 px-6 h-[64px] flex items-center justify-between sticky top-0 z-40">
         <Link to="/chat" className="flex items-center gap-2 no-underline">
           <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
             <path d="M16 2 A14 14 0 1 1 26.1 22" stroke="#0F6E56" strokeWidth="2.5" strokeLinecap="round"/>
@@ -350,8 +350,8 @@ export default function Settings() {
           <span style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[20px] text-[#0F6E56]">Seren</span>
         </Link>
         <div className="flex items-center gap-4">
-          <Link to="/chat" className="text-sm text-[#88877F] hover:text-[#0F6E56] no-underline transition-colors">← Back to chat</Link>
-          <button onClick={handleLogout} className="text-sm text-[#88877F] hover:text-[#0F6E56] bg-transparent border-none cursor-pointer font-sans transition-colors">Log out</button>
+          <Link to="/chat" className="text-sm text-[#88877F] dark:text-white/40 hover:text-[#0F6E56] no-underline transition-colors">← Back to chat</Link>
+          <button onClick={handleLogout} className="text-sm text-[#88877F] dark:text-white/40 hover:text-[#0F6E56] bg-transparent border-none cursor-pointer font-sans transition-colors">Log out</button>
         </div>
       </nav>
 
@@ -385,16 +385,16 @@ export default function Settings() {
           </div>
 
           {/* Deadlines */}
-          <div className="bg-white rounded-2xl border border-[#E1F5EE] p-6">
+          <div className="bg-white dark:bg-[#141F1C] rounded-2xl border border-[#E1F5EE] dark:border-white/10 p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[20px] text-[#04342C] font-normal">Upcoming deadlines</h2>
+              <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[20px] text-[#04342C] dark:text-white font-normal">Upcoming deadlines</h2>
               <button onClick={() => setShowAddModal(true)}
                 className="text-xs font-semibold text-[#0F6E56] bg-[#E1F5EE] px-3 py-1.5 rounded-lg border-none cursor-pointer hover:bg-[#C8F0E3] transition-colors">
                 + Add deadline
               </button>
             </div>
             {eventsLoading ? (
-              <div className="flex flex-col gap-3">{[1,2,3].map(i => <div key={i} className="h-14 rounded-xl bg-[#F6F6F4] animate-pulse" />)}</div>
+              <div className="flex flex-col gap-3">{[1,2,3].map(i => <div key={i} className="h-14 rounded-xl bg-[#F6F6F4] dark:bg-[#1A2622] animate-pulse" />)}</div>
             ) : events.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
                 <div className="w-12 h-12 rounded-xl bg-[#E1F5EE] flex items-center justify-center">
@@ -402,7 +402,7 @@ export default function Settings() {
                     <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                   </svg>
                 </div>
-                <p className="text-sm text-[#88877F]">No deadlines yet.</p>
+                <p className="text-sm text-[#88877F] dark:text-white/40">No deadlines yet.</p>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
@@ -412,17 +412,17 @@ export default function Settings() {
                   const dotColor = urgency === 'urgent' ? 'bg-red-400' : urgency === 'soon' ? 'bg-amber-400' : 'bg-[#5DCAA5]'
                   const badgeStyle = urgency === 'urgent' ? 'bg-red-50 text-red-600' : urgency === 'soon' ? 'bg-amber-50 text-amber-600' : 'bg-[#E1F5EE] text-[#0F6E56]'
                   return (
-                    <div key={event.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#F0F0EE] hover:border-[#E1F5EE] hover:bg-[#FAFAF8] transition-all group">
+                    <div key={event.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#F0F0EE] hover:border-[#E1F5EE] dark:border-white/10 hover:bg-[#FAFAF8] dark:hover:bg-white/5 transition-all group">
                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[#2C2C2A] truncate">{event.title}</p>
-                        <p className="text-xs text-[#88877F]">{event.course} · {formatDeadline(event.deadline)}</p>
+                        <p className="text-sm font-medium text-[#2C2C2A] dark:text-white/90 truncate">{event.title}</p>
+                        <p className="text-xs text-[#88877F] dark:text-white/40">{event.course} · {formatDeadline(event.deadline)}</p>
                       </div>
                       <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${badgeStyle}`}>
                         {urgency.charAt(0).toUpperCase() + urgency.slice(1)}
                       </span>
                       <button onClick={() => handleDeleteEvent(event.id)}
-                        className="opacity-0 group-hover:opacity-100 text-[#AEADA8] hover:text-red-400 bg-transparent border-none cursor-pointer transition-all p-1">
+                        className="opacity-0 group-hover:opacity-100 text-[#AEADA8] dark:text-white/25 hover:text-red-400 bg-transparent border-none cursor-pointer transition-all p-1">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
                         </svg>
@@ -435,11 +435,11 @@ export default function Settings() {
           </div>
 
           {/* Commands */}
-          <div className="bg-white rounded-2xl border border-[#E1F5EE] p-6">
+          <div className="bg-white dark:bg-[#141F1C] rounded-2xl border border-[#E1F5EE] dark:border-white/10 p-6">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[20px] text-[#04342C] font-normal">Commands</h2>
-                <p className="text-xs text-[#88877F] mt-1">
+                <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[20px] text-[#04342C] dark:text-white font-normal">Commands</h2>
+                <p className="text-xs text-[#88877F] dark:text-white/40 mt-1">
                   Used in the chat sidebar and the selection tooltip on any webpage. Toggle which ones appear in the tooltip — max {MAX_TOOLTIP_COMMANDS}.
                 </p>
               </div>
@@ -456,20 +456,20 @@ export default function Settings() {
             )}
 
             {commandsLoading ? (
-              <div className="flex flex-col gap-2 mt-5">{[1,2,3,4].map(i => <div key={i} className="h-14 rounded-xl bg-[#F6F6F4] animate-pulse" />)}</div>
+              <div className="flex flex-col gap-2 mt-5">{[1,2,3,4].map(i => <div key={i} className="h-14 rounded-xl bg-[#F6F6F4] dark:bg-[#1A2622] animate-pulse" />)}</div>
             ) : (
               <div className="flex flex-col gap-2 mt-5">
                 {commands.map(cmd => (
-                  <div key={cmd.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#F0F0EE] hover:border-[#E1F5EE] hover:bg-[#FAFAF8] transition-all group">
+                  <div key={cmd.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#F0F0EE] hover:border-[#E1F5EE] dark:border-white/10 hover:bg-[#FAFAF8] dark:hover:bg-white/5 transition-all group">
                     <span className="text-[#5DCAA5] font-bold text-sm flex-shrink-0">/</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-[#2C2C2A]">{cmd.label}</p>
+                        <p className="text-sm font-semibold text-[#2C2C2A] dark:text-white/90">{cmd.label}</p>
                         {cmd.isDefault && (
-                          <span className="text-[9px] font-semibold text-[#AEADA8] bg-[#F6F6F4] px-1.5 py-0.5 rounded uppercase tracking-wide">Default</span>
+                          <span className="text-[9px] font-semibold text-[#AEADA8] dark:text-white/25 bg-[#F6F6F4] dark:bg-[#1A2622] px-1.5 py-0.5 rounded uppercase tracking-wide">Default</span>
                         )}
                       </div>
-                      <p className="text-xs text-[#88877F] truncate mt-0.5">{cmd.prompt}</p>
+                      <p className="text-xs text-[#88877F] dark:text-white/40 truncate mt-0.5">{cmd.prompt}</p>
                     </div>
 
                     {/* Tooltip toggle */}
@@ -478,7 +478,7 @@ export default function Settings() {
                       className={`flex-shrink-0 flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors font-sans ${
                         cmd.inTooltip
                           ? 'bg-[#E1F5EE] border-[#C8F0E3] text-[#0F6E56]'
-                          : 'bg-[#F6F6F4] border-[#EEEEEC] text-[#AEADA8]'
+                          : 'bg-[#F6F6F4] dark:bg-[#1A2622] border-[#EEEEEC] dark:border-white/10 text-[#AEADA8] dark:text-white/25'
                       }`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${cmd.inTooltip ? 'bg-[#5DCAA5]' : 'bg-[#CECECA]'}`} />
                       Tooltip
@@ -486,7 +486,7 @@ export default function Settings() {
 
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
                       <button onClick={() => openEditCmd(cmd)}
-                        className="text-[#AEADA8] hover:text-[#0F6E56] bg-transparent border-none cursor-pointer p-1 transition-colors">
+                        className="text-[#AEADA8] dark:text-white/25 hover:text-[#0F6E56] bg-transparent border-none cursor-pointer p-1 transition-colors">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -494,7 +494,7 @@ export default function Settings() {
                       </button>
                       {!cmd.isDefault && (
                         <button onClick={() => handleDeleteCmd(cmd.id)}
-                          className="text-[#AEADA8] hover:text-red-400 bg-transparent border-none cursor-pointer p-1 transition-colors">
+                          className="text-[#AEADA8] dark:text-white/25 hover:text-red-400 bg-transparent border-none cursor-pointer p-1 transition-colors">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
                           </svg>
@@ -521,31 +521,31 @@ export default function Settings() {
             </div>
             <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[20px] font-normal mb-1">Get the extension</h2>
             <p className="text-xs text-white/60 mb-5 leading-relaxed">Seren lives in your browser. Add it to Chrome to study smarter.</p>
-            <a href="#" className="flex items-center justify-center gap-2 bg-white text-[#0F6E56] text-sm font-semibold px-4 py-2.5 rounded-xl no-underline hover:bg-[#E1F5EE] transition-colors">
+            <a href="#" className="flex items-center justify-center gap-2 bg-white dark:bg-[#141F1C] text-[#0F6E56] text-sm font-semibold px-4 py-2.5 rounded-xl no-underline hover:bg-[#E1F5EE] dark:hover:bg-white/10 transition-colors">
               Add to Chrome
             </a>
           </div>
 
           {/* Account */}
-          <div className="bg-white rounded-2xl border border-[#E1F5EE] p-6">
-            <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[20px] text-[#04342C] font-normal mb-5">Account</h2>
+          <div className="bg-white dark:bg-[#141F1C] rounded-2xl border border-[#E1F5EE] dark:border-white/10 p-6">
+            <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[20px] text-[#04342C] dark:text-white font-normal mb-5">Account</h2>
             <form onSubmit={handleSaveAccount} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#4A4A47] uppercase tracking-wider">Name</label>
+                <label className="text-xs font-semibold text-[#4A4A47] dark:text-white/50 uppercase tracking-wider">Name</label>
                 <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] bg-[#F6F6F4] text-sm text-[#2C2C2A] outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-[#F6F6F4] dark:bg-[#1A2622] text-sm text-[#2C2C2A] dark:text-white/90 outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#4A4A47] uppercase tracking-wider">Email</label>
+                <label className="text-xs font-semibold text-[#4A4A47] dark:text-white/50 uppercase tracking-wider">Email</label>
                 <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] bg-[#F6F6F4] text-sm text-[#2C2C2A] outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-[#F6F6F4] dark:bg-[#1A2622] text-sm text-[#2C2C2A] dark:text-white/90 outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
               </div>
               <div className="border-t border-[#F0F0EE] pt-4 flex flex-col gap-3">
-                <p className="text-xs font-semibold text-[#4A4A47] uppercase tracking-wider">Change password</p>
+                <p className="text-xs font-semibold text-[#4A4A47] dark:text-white/50 uppercase tracking-wider">Change password</p>
                 <input type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} placeholder="Current password"
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] bg-[#F6F6F4] text-sm text-[#2C2C2A] outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-[#F6F6F4] dark:bg-[#1A2622] text-sm text-[#2C2C2A] dark:text-white/90 outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
                 <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password"
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] bg-[#F6F6F4] text-sm text-[#2C2C2A] outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-[#F6F6F4] dark:bg-[#1A2622] text-sm text-[#2C2C2A] dark:text-white/90 outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
               </div>
               {accountMsg && (
                 <p className={`text-sm px-3 py-2.5 rounded-xl ${accountMsg.type === 'ok' ? 'bg-[#E1F5EE] text-[#0F6E56]' : 'bg-red-50 text-red-500'}`}>
@@ -560,9 +560,9 @@ export default function Settings() {
           </div>
 
           {/* Danger zone */}
-          <div className="bg-white rounded-2xl border border-red-100 p-6">
+          <div className="bg-white dark:bg-[#141F1C] rounded-2xl border border-red-100 p-6">
             <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[18px] text-red-700 font-normal mb-1">Danger zone</h2>
-            <p className="text-xs text-[#88877F] mb-4">Permanently delete your account and all your data.</p>
+            <p className="text-xs text-[#88877F] dark:text-white/40 mb-4">Permanently delete your account and all your data.</p>
             {!confirmDelete ? (
               <button onClick={() => setConfirmDelete(true)}
                 className="text-sm text-red-500 bg-red-50 hover:bg-red-100 border border-red-100 px-4 py-2 rounded-xl cursor-pointer font-medium transition-colors font-sans">
@@ -577,7 +577,7 @@ export default function Settings() {
                     {deleting ? 'Deleting…' : 'Yes, delete'}
                   </button>
                   <button onClick={() => setConfirmDelete(false)}
-                    className="flex-1 text-sm text-[#88877F] bg-[#F6F6F4] hover:bg-[#EEEEEC] border border-[#E1F5EE] px-3 py-2 rounded-xl cursor-pointer font-medium transition-colors font-sans">
+                    className="flex-1 text-sm text-[#88877F] dark:text-white/40 bg-[#F6F6F4] dark:bg-[#1A2622] hover:bg-[#EEEEEC] dark:hover:bg-white/10 border border-[#E1F5EE] dark:border-white/10 px-3 py-2 rounded-xl cursor-pointer font-medium transition-colors font-sans">
                     Cancel
                   </button>
                 </div>
@@ -590,23 +590,23 @@ export default function Settings() {
       {/* Add deadline modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-[400px] shadow-2xl">
-            <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[22px] text-[#04342C] font-normal mb-5">Add a deadline</h2>
+          <div className="bg-white dark:bg-[#141F1C] rounded-2xl p-6 w-full max-w-[400px] shadow-2xl">
+            <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[22px] text-[#04342C] dark:text-white font-normal mb-5">Add a deadline</h2>
             <form onSubmit={handleAddDeadline} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#4A4A47] uppercase tracking-wider">Title</label>
+                <label className="text-xs font-semibold text-[#4A4A47] dark:text-white/50 uppercase tracking-wider">Title</label>
                 <input type="text" value={addTitle} onChange={e => setAddTitle(e.target.value)} placeholder="e.g. Midterm exam" required
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] bg-[#F6F6F4] text-sm outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-[#F6F6F4] dark:bg-[#1A2622] text-sm outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#4A4A47] uppercase tracking-wider">Course</label>
+                <label className="text-xs font-semibold text-[#4A4A47] dark:text-white/50 uppercase tracking-wider">Course</label>
                 <input type="text" value={addCourse} onChange={e => setAddCourse(e.target.value)} placeholder="e.g. CSI2110" required
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] bg-[#F6F6F4] text-sm outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-[#F6F6F4] dark:bg-[#1A2622] text-sm outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#4A4A47] uppercase tracking-wider">Due date</label>
+                <label className="text-xs font-semibold text-[#4A4A47] dark:text-white/50 uppercase tracking-wider">Due date</label>
                 <input type="datetime-local" value={addDate} onChange={e => setAddDate(e.target.value)} required
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] bg-[#F6F6F4] text-sm outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-[#F6F6F4] dark:bg-[#1A2622] text-sm outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
               </div>
               <div className="flex gap-3 mt-1">
                 <button type="submit" disabled={addLoading}
@@ -614,7 +614,7 @@ export default function Settings() {
                   {addLoading ? 'Adding…' : 'Add deadline'}
                 </button>
                 <button type="button" onClick={() => setShowAddModal(false)}
-                  className="flex-1 bg-[#F6F6F4] text-[#88877F] text-sm font-medium py-2.5 rounded-xl border border-[#E1F5EE] cursor-pointer transition-colors font-sans">
+                  className="flex-1 bg-[#F6F6F4] dark:bg-[#1A2622] text-[#88877F] dark:text-white/40 text-sm font-medium py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 cursor-pointer transition-colors font-sans">
                   Cancel
                 </button>
               </div>
@@ -626,24 +626,24 @@ export default function Settings() {
       {/* Command modal */}
       {showCmdModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-[420px] shadow-2xl">
-            <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[22px] text-[#04342C] font-normal mb-2">
+          <div className="bg-white dark:bg-[#141F1C] rounded-2xl p-6 w-full max-w-[420px] shadow-2xl">
+            <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[22px] text-[#04342C] dark:text-white font-normal mb-2">
               {editingCmd ? 'Edit command' : 'New command'}
             </h2>
-            <p className="text-xs text-[#88877F] mb-5">The prompt will be pasted into the chat — you can edit it before sending.</p>
+            <p className="text-xs text-[#88877F] dark:text-white/40 mb-5">The prompt will be pasted into the chat — you can edit it before sending.</p>
             <form onSubmit={handleSaveCmd} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#4A4A47] uppercase tracking-wider">Command name</label>
+                <label className="text-xs font-semibold text-[#4A4A47] dark:text-white/50 uppercase tracking-wider">Command name</label>
                 <input type="text" value={cmdLabel} onChange={e => setCmdLabel(e.target.value)}
                   placeholder="e.g. Explain" required
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] bg-[#F6F6F4] text-sm outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-[#F6F6F4] dark:bg-[#1A2622] text-sm outline-none focus:border-[#5DCAA5] transition-colors font-sans" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#4A4A47] uppercase tracking-wider">Prompt template</label>
+                <label className="text-xs font-semibold text-[#4A4A47] dark:text-white/50 uppercase tracking-wider">Prompt template</label>
                 <textarea value={cmdPrompt} onChange={e => setCmdPrompt(e.target.value)}
                   placeholder="e.g. Explain the following concept in simple terms:" required rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] bg-[#F6F6F4] text-sm outline-none focus:border-[#5DCAA5] transition-colors font-sans resize-none" />
-                <p className="text-[10px] text-[#AEADA8]">This will be pasted into the input. You can add your content after it.</p>
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 bg-[#F6F6F4] dark:bg-[#1A2622] text-sm outline-none focus:border-[#5DCAA5] transition-colors font-sans resize-none" />
+                <p className="text-[10px] text-[#AEADA8] dark:text-white/25">This will be pasted into the input. You can add your content after it.</p>
               </div>
               <div className="flex gap-3 mt-1">
                 <button type="submit"
@@ -651,7 +651,7 @@ export default function Settings() {
                   {editingCmd ? 'Save changes' : 'Create command'}
                 </button>
                 <button type="button" onClick={() => setShowCmdModal(false)}
-                  className="flex-1 bg-[#F6F6F4] text-[#88877F] text-sm font-medium py-2.5 rounded-xl border border-[#E1F5EE] cursor-pointer transition-colors font-sans">
+                  className="flex-1 bg-[#F6F6F4] dark:bg-[#1A2622] text-[#88877F] dark:text-white/40 text-sm font-medium py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 cursor-pointer transition-colors font-sans">
                   Cancel
                 </button>
               </div>
