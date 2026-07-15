@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 
 const API_BASE = 'https://seren-production-834b.up.railway.app'
 
@@ -12,6 +12,8 @@ const quote = quotes[Math.floor(Math.random() * quotes.length)]
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const infoMessage = (location.state as { message?: string } | null)?.message
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -110,6 +112,13 @@ export default function Login() {
         <div className="w-full max-w-[400px]">
           <h1 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[32px] text-[#04342C] dark:text-white font-normal mb-1">Log in</h1>
           <p className="text-sm text-[#88877F] dark:text-white/40 mb-8">Good to see you again.</p>
+
+          {infoMessage && (
+            <div className="flex items-center gap-2 text-sm text-[#0F6E56] dark:text-[#5DCAA5] bg-[#E1F5EE] dark:bg-[#5DCAA5]/10 border border-[#C8F0E3] dark:border-[#5DCAA5]/20 px-4 py-3 rounded-xl mb-5">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              {infoMessage}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">

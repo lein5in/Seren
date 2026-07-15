@@ -476,7 +476,52 @@ function pasteIntoInput(text) {
   input.setSelectionRange(text.length, text.length)
 }
 
-// ── Send to Seren ─────────────────────────────────────────────────
+// ── Send to Seren (streamed via SSE) ────────────────────────────────
+
+let activeStreamController = null
+
+function setSendButtonMode(mode) {
+  // mode: 'send' | 'stop'
+  const btn = document.getElementById('btn-send')
+  if (!btn) return
+  btn.dataset.mode = mode
+  if (mode === 'stop') {
+    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`
+    btn.title = 'Stop generating'
+  } else {
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`
+    btn.title = ''
+  }
+}
+
+function appendStreamingMessage() {
+  const container = document.getElementById('chat-messages')
+  const div = document.createElement('div')
+  div.className = 'message seren'
+  container.appendChild(div)
+  container.scrollTop = container.scrollHeight
+
+  return {
+    el: div,
+    update(text) {
+      div.innerHTML = marked.parse(text)
+      div.querySelectorAll('pre code').forEach(block => {
+        if (typeof hljs !== 'undefined') hljs.highlightElement(block)
+      })
+      container.scrollTop = container.scrollHeight
+    },
+    finalize(text) {
+      if (text.length > 150) {
+        const exportBtn = document.createElement('button')
+        exportBtn.className = 'export-btn'
+        exportBtn.textContent = 'Export PDF'
+        exportBtn.addEventListener('click', () => exportMessageAsPDF(text))
+        div.appendChild(exportBtn)
+      }
+      saveHistory()
+    }
+  }
+}
 
 async function sendToSeren(userText) {
   if (isTabMode) { showPanel('chat') } else { showView('view-chat') }
@@ -484,32 +529,88 @@ async function sendToSeren(userText) {
   appendLoading()
 
   chrome.storage.local.get(['userId', 'serenToken'], async (res) => {
+    const controller = new AbortController()
+    activeStreamController = controller
+    setSendButtonMode('stop')
+
+    let stream = null
+    let accumulated = ''
+
     try {
-      const response = await fetch(`${API_BASE}/ai/chat`, {
+      const response = await fetch(`${API_BASE}/ai/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(res.serenToken ? { Authorization: `Bearer ${res.serenToken}` } : {})
         },
-        body: JSON.stringify({ message: userText, user_id: res.userId || 1 })
+        body: JSON.stringify({ message: userText, user_id: res.userId || 1 }),
+        signal: controller.signal
       })
-      const data = await response.json()
-      removeLoading()
 
-      if (data.type === 'flashcards' && data.data) {
-        appendFlashcards(data.data)
-      } else if (data.type === 'quiz' && data.data) {
-        appendQuiz(data.data)
-      } else if (data.type === 'visual' && data.data) {
-        appendVisual(data.data)
-      } else {
-        appendMessage('seren', data.reply || 'Something went wrong.')
+      if (!response.ok || !response.body) {
+        removeLoading()
+        if (response.status === 429) {
+          appendMessage('seren', "You're sending messages a bit too fast — wait a few seconds and try again.")
+        } else if (response.status === 401 || response.status === 403) {
+          appendMessage('seren', 'Your session expired. Please log out and log back in from Settings.')
+        } else {
+          appendMessage('seren', 'Could not reach Seren. Is the backend running?')
+        }
+        setSendButtonMode('send')
+        activeStreamController = null
+        return
       }
-    } catch {
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let handledStructured = false
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const events = buffer.split('\n\n')
+        buffer = events.pop() || ''
+
+        for (const raw of events) {
+          if (!raw.startsWith('data: ')) continue
+          const json = JSON.parse(raw.slice(6))
+
+          if (json.event === 'token') {
+            if (!stream) { removeLoading(); stream = appendStreamingMessage() }
+            accumulated += json.text
+            stream.update(accumulated)
+          } else if (json.event === 'complete') {
+            removeLoading()
+            handledStructured = true
+            if (json.type === 'flashcards') appendFlashcards(json.data)
+            else if (json.type === 'quiz') appendQuiz(json.data)
+            else if (json.type === 'visual') appendVisual(json.data)
+          } else if (json.event === 'error') {
+            removeLoading()
+            appendMessage('seren', json.message || 'Something went wrong.')
+          }
+        }
+      }
+
+      if (stream && !handledStructured) stream.finalize(accumulated)
+    } catch (err) {
       removeLoading()
-      appendMessage('seren', 'Could not reach Seren. Is the backend running?')
+      if (err?.name !== 'AbortError') {
+        appendMessage('seren', 'Could not reach Seren. Is the backend running?')
+      } else if (stream && accumulated) {
+        stream.finalize(accumulated)
+      }
+    } finally {
+      setSendButtonMode('send')
+      activeStreamController = null
     }
   })
+}
+
+function stopSerenGeneration() {
+  activeStreamController?.abort()
 }
 
 // ── Focus timer ───────────────────────────────────────────────────
@@ -595,6 +696,11 @@ document.addEventListener('DOMContentLoaded', () => {
   })
 
   document.getElementById('btn-send')?.addEventListener('click', () => {
+    const btn = document.getElementById('btn-send')
+    if (btn.dataset.mode === 'stop') {
+      stopSerenGeneration()
+      return
+    }
     const input = document.getElementById('chat-input')
     const text = input.value.trim()
     if (!text) return
@@ -656,7 +762,10 @@ document.addEventListener('DOMContentLoaded', () => {
   })
 
   document.getElementById('chat-input')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('btn-send').click()
+    if (e.key !== 'Enter') return
+    const btn = document.getElementById('btn-send')
+    if (btn.dataset.mode === 'stop') return // ignore Enter while generating, don't accidentally stop
+    btn.click()
   })
 
   document.getElementById('btn-focus-start')?.addEventListener('click', () => {

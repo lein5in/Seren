@@ -346,6 +346,8 @@ export default function Chat() {
     setAttachedFile(null)
   }
 
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
   function handleLogout() {
     localStorage.removeItem('seren_token')
     localStorage.removeItem('seren_user')
@@ -439,7 +441,12 @@ export default function Chat() {
         signal: controller.signal
       })
 
-      if (!res.ok || !res.body) throw new Error('Stream failed')
+      if (!res.ok || !res.body) {
+        if (res.status === 429) throw new Error('RATE_LIMIT')
+        if (res.status === 401 || res.status === 403) throw new Error('AUTH_EXPIRED')
+        if (res.status >= 500) throw new Error('SERVER_ERROR')
+        throw new Error('Stream failed')
+      }
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -477,7 +484,18 @@ export default function Chat() {
           setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: '_(stopped)_' } : m))
         }
       } else {
-        setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: 'Could not reach Seren. Is the backend running?' } : m))
+        let msg = 'Could not reach Seren. Is the backend running?'
+        if (err?.message === 'RATE_LIMIT') {
+          msg = "You're sending messages a bit too fast — wait a few seconds and try again."
+        } else if (err?.message === 'AUTH_EXPIRED') {
+          msg = 'Your session expired. Please log out and log back in.'
+        } else if (err?.message === 'SERVER_ERROR') {
+          msg = 'Seren ran into a problem on the server side. Try again in a moment.'
+        } else if (!accumulated && err?.name === 'TypeError') {
+          // Most browsers throw a generic TypeError for network failures / CORS / server unreachable
+          msg = 'Could not reach Seren — check your connection or that the backend is running.'
+        }
+        setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: msg } : m))
       }
     } finally {
       setLoading(false)
@@ -668,7 +686,7 @@ export default function Chat() {
             </svg>
             Settings
           </Link>
-          <button onClick={handleLogout}
+          <button onClick={() => setShowLogoutConfirm(true)}
             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-white/45 hover:text-white/80 hover:bg-white/07 transition-all cursor-pointer border-none bg-transparent w-full text-left">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
@@ -862,6 +880,26 @@ export default function Chat() {
           </div>
         </div>
       </main>
+
+      {/* Logout confirmation */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4">
+          <div className="bg-white dark:bg-[#141F1C] rounded-2xl p-6 w-full max-w-[360px] shadow-2xl">
+            <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[19px] text-[#04342C] dark:text-white font-normal mb-2">Log out?</h2>
+            <p className="text-sm text-[#88877F] dark:text-white/40 mb-5">You'll need to log back in to access your conversation and deadlines.</p>
+            <div className="flex gap-3">
+              <button onClick={handleLogout}
+                className="flex-1 bg-[#0F6E56] hover:bg-[#085041] text-white text-sm font-medium py-2.5 rounded-xl border-none cursor-pointer transition-colors font-sans">
+                Log out
+              </button>
+              <button onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 bg-[#F6F6F4] dark:bg-[#1A2622] text-[#88877F] dark:text-white/40 text-sm font-medium py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 cursor-pointer transition-colors font-sans">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -121,6 +121,7 @@ export default function Settings() {
   // ── Deadlines ─────────────────────────────────────────────────
   const [events, setEvents] = useState<Event[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
+  const [pageError, setPageError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -128,9 +129,15 @@ export default function Settings() {
     fetch(`${API_BASE}/events/user/${user.id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error()
+        return r.json()
+      })
       .then(data => { setEvents(Array.isArray(data) ? data : []); setEventsLoading(false) })
-      .catch(() => setEventsLoading(false))
+      .catch(() => {
+        setEventsLoading(false)
+        setPageError('Could not load your deadlines. Check your connection and refresh.')
+      })
   }, [user])
 
   const nextEvent = events.length > 0 ? events[0] : null
@@ -163,19 +170,27 @@ export default function Settings() {
         ))
         setShowAddModal(false)
         setAddTitle(''); setAddCourse(''); setAddDate('')
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setPageError(d.detail || 'Could not add this deadline.')
       }
-    } catch {}
+    } catch {
+      setPageError('Could not reach the server. Check your connection.')
+    }
     setAddLoading(false)
   }
 
   async function handleDeleteEvent(eventId: number) {
     const token = localStorage.getItem('seren_token')
     try {
-      await fetch(`${API_BASE}/events/${eventId}`, {
+      const res = await fetch(`${API_BASE}/events/${eventId}`, {
         method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
       })
+      if (!res.ok) throw new Error()
       setEvents(prev => prev.filter(e => e.id !== eventId))
-    } catch {}
+    } catch {
+      setPageError('Could not delete this deadline. Try again.')
+    }
   }
 
   // ── Account ───────────────────────────────────────────────────
@@ -211,6 +226,7 @@ export default function Settings() {
         setUser(updated)
         localStorage.setItem('seren_user', JSON.stringify(updated))
       }
+      let passwordChanged = false
       if (oldPassword && newPassword) {
         const res = await fetch(`${API_BASE}/users/${user.id}/password`, {
           method: 'PUT',
@@ -223,7 +239,20 @@ export default function Settings() {
           setSaving(false); return
         }
         setOldPassword(''); setNewPassword('')
+        passwordChanged = true
       }
+
+      if (passwordChanged) {
+        // The old token is still technically valid (JWTs can't be revoked
+        // server-side without extra infrastructure), but forcing a fresh
+        // login here at least makes sure this device re-authenticates
+        // with the new password right away.
+        localStorage.removeItem('seren_token')
+        localStorage.removeItem('seren_user')
+        navigate('/login', { state: { message: 'Password updated. Please log in again with your new password.' } })
+        return
+      }
+
       setAccountMsg({ type: 'ok', text: 'Changes saved.' })
     } catch {
       setAccountMsg({ type: 'err', text: 'Server unreachable.' })
@@ -239,15 +268,22 @@ export default function Settings() {
     setDeleting(true)
     const token = localStorage.getItem('seren_token')
     try {
-      await fetch(`${API_BASE}/users/${user.id}`, {
+      const res = await fetch(`${API_BASE}/users/${user.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })
-    } catch {}
+      if (!res.ok) throw new Error()
+    } catch {
+      setPageError('Could not delete your account. Check your connection and try again.')
+      setDeleting(false)
+      return
+    }
     localStorage.removeItem('seren_token')
     localStorage.removeItem('seren_user')
     navigate('/')
   }
+
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   function handleLogout() {
     localStorage.removeItem('seren_token')
@@ -351,9 +387,23 @@ export default function Settings() {
         </Link>
         <div className="flex items-center gap-4">
           <Link to="/chat" className="text-sm text-[#88877F] dark:text-white/40 hover:text-[#0F6E56] no-underline transition-colors">← Back to chat</Link>
-          <button onClick={handleLogout} className="text-sm text-[#88877F] dark:text-white/40 hover:text-[#0F6E56] bg-transparent border-none cursor-pointer font-sans transition-colors">Log out</button>
+          <button onClick={() => setShowLogoutConfirm(true)} className="text-sm text-[#88877F] dark:text-white/40 hover:text-[#0F6E56] bg-transparent border-none cursor-pointer font-sans transition-colors">Log out</button>
         </div>
       </nav>
+
+      {pageError && (
+        <div className="max-w-[1100px] mx-auto px-6 pt-6">
+          <div className="flex items-center justify-between gap-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 px-4 py-3 rounded-xl">
+            <span>{pageError}</span>
+            <button onClick={() => setPageError(null)}
+              className="text-red-400 hover:text-red-600 dark:hover:text-red-300 bg-transparent border-none cursor-pointer flex-shrink-0 p-0.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-[1100px] mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
 
@@ -656,6 +706,26 @@ export default function Settings() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Logout confirmation */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4">
+          <div className="bg-white dark:bg-[#141F1C] rounded-2xl p-6 w-full max-w-[360px] shadow-2xl">
+            <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[19px] text-[#04342C] dark:text-white font-normal mb-2">Log out?</h2>
+            <p className="text-sm text-[#88877F] dark:text-white/40 mb-5">You'll need to log back in to access your conversation and deadlines.</p>
+            <div className="flex gap-3">
+              <button onClick={handleLogout}
+                className="flex-1 bg-[#0F6E56] hover:bg-[#085041] text-white text-sm font-medium py-2.5 rounded-xl border-none cursor-pointer transition-colors font-sans">
+                Log out
+              </button>
+              <button onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 bg-[#F6F6F4] dark:bg-[#1A2622] text-[#88877F] dark:text-white/40 text-sm font-medium py-2.5 rounded-xl border border-[#E1F5EE] dark:border-white/10 cursor-pointer transition-colors font-sans">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

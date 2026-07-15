@@ -10,6 +10,8 @@ router = APIRouter(prefix="/upload", tags=["Upload"])
 # Stockage en mémoire (simple pour la démo)
 pdf_store = {}
 
+MAX_PDF_SIZE_BYTES = 15 * 1024 * 1024  # 15 MB
+
 @router.post("/pdf/{user_id}")
 async def upload_pdf(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
     require_self(user_id, current_user_id)
@@ -21,6 +23,8 @@ async def upload_pdf(user_id: int, file: UploadFile = File(...), db: Session = D
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
 
     contents = await file.read()
+    if len(contents) > MAX_PDF_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="PDF is too large (max 15 MB)")
     text = ""
     with pdfplumber.open(io.BytesIO(contents)) as pdf:
         for page in pdf.pages:
