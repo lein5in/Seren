@@ -1,26 +1,22 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum as SAEnum, ForeignKey
+import os
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum as SAEnum, ForeignKey, Text, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
+from dotenv import load_dotenv
 import enum
 
-# ========================
-# Database Setup
-# ========================
+load_dotenv()
 
-DATABASE_URL = "sqlite:///./seren.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./seren.db")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}  # Needed for SQLite
-)
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# ========================
-# Enums
-# ========================
 
 class AnxietyLevelDB(str, enum.Enum):
     low = "low"
@@ -47,9 +43,16 @@ class PriorityDB(str, enum.Enum):
     high = "high"
     urgent = "urgent"
 
-# ========================
-# Database Tables
-# ========================
+class MessageRoleDB(str, enum.Enum):
+    user = "user"
+    assistant = "assistant"
+
+class MessageTypeDB(str, enum.Enum):
+    text = "text"
+    flashcards = "flashcards"
+    quiz = "quiz"
+    visual = "visual"
+
 
 class UserDB(Base):
     __tablename__ = "users"
@@ -59,7 +62,6 @@ class UserDB(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
 
-    # Profile fields
     anxiety_level = Column(SAEnum(AnxietyLevelDB), default=AnxietyLevelDB.medium)
     current_period = Column(SAEnum(StudyPeriodDB), default=StudyPeriodDB.semester)
     preferred_reminder_days = Column(Integer, default=3)
@@ -67,15 +69,26 @@ class UserDB(Base):
     productive_hours_end = Column(Integer, default=17)
     max_daily_tasks = Column(Integer, default=5)
 
-    # Relationship — cascade="all, delete-orphan" means deleting a user
-    # via the ORM (db.delete(user)) also deletes all their events.
-    # Fixes the known "delete account doesn't really delete everything" bug.
     events = relationship(
         "EventDB",
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    conversations = relationship(
+        "ConversationDB",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    memory_summary = relationship(
+        "UserMemorySummaryDB",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
 
 class EventDB(Base):
     __tablename__ = "events"
@@ -90,15 +103,76 @@ class EventDB(Base):
     reminder_sent = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Foreign key — ondelete="CASCADE" backs up the ORM-level cascade above
-    # at the database level too (belt and suspenders).
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     user = relationship("UserDB", back_populates="events")
 
-# ========================
-# Dependency
-# Called in routes to get a DB session
-# ========================
+
+class ConversationDB(Base):
+    __tablename__ = "conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String, nullable=False, default="New conversation")
+    archived = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("UserDB", back_populates="conversations")
+    messages = relationship(
+        "MessageDB",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="MessageDB.sequence",
+    )
+    pdf_documents = relationship(
+        "PDFDocumentDB",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class MessageDB(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role = Column(SAEnum(MessageRoleDB), nullable=False)
+    type = Column(SAEnum(MessageTypeDB), nullable=False, default=MessageTypeDB.text)
+    content = Column(Text, nullable=True)
+    data = Column(JSON, nullable=True)
+    sequence = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    conversation = relationship("ConversationDB", back_populates="messages")
+
+
+class PDFDocumentDB(Base):
+    __tablename__ = "pdf_documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    filename = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    conversation = relationship("ConversationDB", back_populates="pdf_documents")
+
+
+class UserMemorySummaryDB(Base):
+    __tablename__ = "user_memory_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    summary = Column(Text, nullable=True)
+    last_summarized_message_id = Column(Integer, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("UserDB", back_populates="memory_summary")
+
 
 def get_db():
     db = SessionLocal()
@@ -107,9 +181,6 @@ def get_db():
     finally:
         db.close()
 
-# ========================
-# Create all tables
-# ========================
 
 def init_db():
     Base.metadata.create_all(bind=engine)

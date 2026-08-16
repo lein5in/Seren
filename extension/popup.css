@@ -21,9 +21,32 @@
   --surface:   #FAFAF8;
 }
 
-/* ══════════════════════════════════════
-   BASE
-══════════════════════════════════════ */
+body.dark {
+  --white:     #141F1C;
+  --surface:   #0B1210;
+  --gray-50:   #1A2622;
+  --gray-100:  #22302B;
+  --gray-300:  #3A4A44;
+  --gray-400:  #6B7B75;
+  --gray-500:  #8FA098;
+  --gray-700:  #C7D0CC;
+  --gray-800:  #EDEFEE;
+  --green-50:  #10241D;
+  --green-100: #163A2E;
+}
+
+body.dark .icon-btn { color: rgba(255,255,255,0.55); }
+body.dark .icon-btn:hover { color: rgba(255,255,255,0.9); }
+body.dark .quiz-option.correct { background: #123021; border-color: #5DCAA5; color: #9FE1CB; }
+body.dark .quiz-option.wrong { background: #331515; border-color: #E05252; color: #FCA5A5; }
+body.dark .quiz-fb-correct { color: #5DCAA5; }
+body.dark .quiz-fb-wrong { color: #FCA5A5; }
+body.dark .deadline-badge.urgent { background: #331515; color: #FCA5A5; }
+body.dark .deadline-badge.soon   { background: #332714; color: #FBBF24; }
+body.dark .message.seren pre code { color: #C8F0E3; }
+body.dark .flashcard-back { background: #061F19; }
+
+
 html, body {
   height: 100%;
 }
@@ -34,6 +57,7 @@ body {
   background: var(--surface);
   color: var(--gray-800);
   -webkit-font-smoothing: antialiased;
+  transition: background 0.2s, color 0.2s;
 }
 
 .app-shell {
@@ -43,16 +67,12 @@ body {
   height: 100%;
 }
 
-/* ══════════════════════════════════════
-   SIDEBAR — hidden in popup mode
-══════════════════════════════════════ */
+
 .sidebar {
   display: none;
 }
 
-/* ══════════════════════════════════════
-   POPUP HEADER — visible in popup only
-══════════════════════════════════════ */
+
 .popup-header {
   display: flex;
   align-items: center;
@@ -99,16 +119,11 @@ body {
   color: rgba(255,255,255,0.9);
 }
 
-/* ══════════════════════════════════════
-   PANEL HEADER — tab mode panel titles
-══════════════════════════════════════ */
+
 .panel-header {
   display: none;
 }
 
-/* ══════════════════════════════════════
-   VIEWS
-══════════════════════════════════════ */
 .view { display: none; animation: viewIn 0.15s ease; }
 .view.active { display: block; }
 
@@ -117,7 +132,7 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Home — greeting block ── */
+
 .greeting-block {
   background: var(--green-900);
   padding: 18px 14px 20px;
@@ -149,7 +164,7 @@ body {
   gap: 8px;
 }
 
-/* ── Buttons ── */
+
 .btn-primary {
   width: 100%;
   padding: 12px 16px;
@@ -185,7 +200,7 @@ body {
 
 .btn-secondary:hover { background: var(--gray-50); }
 
-/* ── Pill row ── */
+
 .pill-row {
   display: flex;
   gap: 7px;
@@ -434,6 +449,10 @@ body {
   align-self: flex-end;
 }
 
+body.dark .message.user {
+  color: #ffffff;
+}
+
 .message.loading {
   background: var(--white);
   border: 1px solid var(--gray-100);
@@ -547,6 +566,8 @@ body {
   letter-spacing: -0.02em;
 }
 
+body.dark .focus-timer { color: var(--green-400); }
+
 .focus-btns { display: flex; gap: 8px; width: 100%; }
 
 .focus-btns .btn-primary,
@@ -598,6 +619,8 @@ body {
   font-weight: 400;
 }
 
+body.dark .overwhelm-title { color: var(--green-400); }
+
 .overwhelm-desc {
   font-size: 12px;
   color: var(--gray-500);
@@ -619,6 +642,8 @@ body {
   color: var(--green-800);
   margin-bottom: 4px;
 }
+
+body.dark .overwhelm-task-title { color: var(--green-400); }
 
 .overwhelm-task-date {
   font-size: 11px;
@@ -797,6 +822,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    max-height: 180px;
+    overflow-y: auto;
   }
 
   .sidebar-quick-item {
@@ -840,6 +867,8 @@ body {
     font-family: 'DM Sans', system-ui, sans-serif;
     padding: 0;
     transition: color 0.15s;
+    width: 100%;
+    text-align: left;
   }
 
   .sidebar-footer-btn:hover { color: rgba(255,255,255,0.65); }
@@ -874,6 +903,8 @@ body {
     color: var(--green-900);
     font-weight: 400;
   }
+
+  body.dark .panel-title { color: var(--green-400); }
 
   /* ── Chat in tab mode ── */
   #view-chat {
@@ -990,6 +1021,12 @@ body {
   line-height: 1.25;
 }
 
+body.dark .message.seren h1,
+body.dark .message.seren h2,
+body.dark .message.seren h3 {
+  color: var(--green-400);
+}
+
 .message.seren h1 { font-size: 15px; }
 .message.seren h2 { font-size: 13.5px; }
 .message.seren h3 { font-size: 12.5px; }
@@ -1019,6 +1056,8 @@ body {
   color: var(--green-800);
 }
 
+body.dark .message.seren strong { color: var(--green-400); }
+
 .message.seren em {
   color: var(--gray-500);
   font-style: italic;
@@ -1032,6 +1071,8 @@ body {
   font-size: 11px;
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
+
+body.dark .message.seren code { color: var(--green-400); }
 
 .message.seren pre {
   background: var(--green-900);
@@ -1064,6 +1105,8 @@ body {
   text-align: left;
   border-bottom: 2px solid var(--green-100);
 }
+
+body.dark .message.seren th { color: var(--green-400); }
 
 .message.seren td {
   padding: 6px 10px;
@@ -1125,6 +1168,8 @@ body {
   letter-spacing: 0.08em;
 }
 
+body.dark .flashcard-topic { color: var(--green-400); }
+
 .flashcard-counter {
   font-size: 11px;
   color: var(--gray-400);
@@ -1173,6 +1218,8 @@ body {
   color: var(--green-900);
   line-height: 1.5;
 }
+
+body.dark .flashcard-front p { color: var(--green-400); }
 
 .flashcard-hint {
   font-size: 10px;
@@ -1249,6 +1296,8 @@ body {
   letter-spacing: 0.08em;
 }
 
+body.dark .quiz-topic { color: var(--green-400); }
+
 .quiz-counter { font-size: 11px; color: var(--gray-400); }
 
 .quiz-question {
@@ -1299,6 +1348,7 @@ body {
 
 .quiz-result-emoji { font-size: 32px; }
 .quiz-result-score { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--green-900); }
+body.dark .quiz-result-score { color: var(--green-400); }
 .quiz-result-pct { font-size: 13px; color: var(--green-700); font-weight: 600; }
 .quiz-result-msg { font-size: 12px; color: var(--gray-500); margin-bottom: 8px; }
 
@@ -1334,6 +1384,8 @@ body {
   padding: 5px 10px;
   border-radius: 8px;
 }
+
+body.dark .file-chip { color: var(--green-400); }
 
 .export-btn {
   display: inline-flex;
@@ -1372,6 +1424,8 @@ body {
   width: fit-content;
   max-width: calc(100% - 28px);
 }
+
+body.dark .input-file-chip { color: var(--green-400); }
 
 .input-file-chip span {
   white-space: nowrap;

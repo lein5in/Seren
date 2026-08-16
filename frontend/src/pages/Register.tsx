@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-
-const API_BASE = 'https://seren-production-834b.up.railway.app'
+import { API_BASE } from '../config'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -35,10 +34,10 @@ export default function Register() {
   return (
     <div className="min-h-screen flex">
 
-      {/* LEFT PANEL */}
+      {}
       <div className="hidden lg:flex flex-col justify-between w-[45%] bg-[#04342C] px-14 py-12 relative overflow-hidden">
 
-        {/* Background decoration */}
+        {}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-[-80px] right-[-80px] w-[320px] h-[320px] rounded-full bg-[#0F6E56] opacity-20 blur-3xl" />
           <div className="absolute bottom-[-60px] left-[-60px] w-[260px] h-[260px] rounded-full bg-[#1D9E75] opacity-15 blur-3xl" />
@@ -52,7 +51,7 @@ export default function Register() {
           </svg>
         </div>
 
-        {/* Logo */}
+        {}
         <Link to="/" className="flex items-center gap-2 no-underline relative z-10">
           <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
             <path d="M16 2 A14 14 0 1 1 26.1 22" stroke="#5DCAA5" strokeWidth="2.5" strokeLinecap="round"/>
@@ -64,7 +63,7 @@ export default function Register() {
           <span style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[22px] text-white tracking-wide">Seren</span>
         </Link>
 
-        {/* Center content */}
+        {}
         <div className="relative z-10">
           <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-8">
             <span className="w-2 h-2 rounded-full bg-[#5DCAA5] animate-pulse" />
@@ -78,7 +77,7 @@ export default function Register() {
           </p>
         </div>
 
-        {/* Feature pills */}
+        {}
         <div className="relative z-10 flex flex-col gap-3">
           {[
             { icon: '📚', text: 'Knows your syllabus & deadlines' },
@@ -93,10 +92,10 @@ export default function Register() {
         </div>
       </div>
 
-      {/* RIGHT PANEL */}
+      {}
       <div className="flex-1 flex flex-col items-center justify-center px-8 bg-[#F8F8F6] dark:bg-[#0B1210] transition-colors">
 
-        {/* Mobile logo */}
+        {}
         <Link to="/" className="flex lg:hidden items-center gap-2 no-underline mb-10">
           <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
             <path d="M16 2 A14 14 0 1 1 26.1 22" stroke="#0F6E56" strokeWidth="2.5" strokeLinecap="round"/>

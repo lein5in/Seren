@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-
-const API_BASE = 'https://seren-production-834b.up.railway.app'
+import { API_BASE } from '../config'
 
 function getDaysUntil(deadline: string) {
   const now = new Date()
@@ -36,11 +35,11 @@ type CustomCommand = {
   id: string
   label: string
   prompt: string
-  isDefault?: boolean   // true for the 4 built-in commands — can't be deleted, only edited/hidden
-  inTooltip: boolean    // whether it shows in the floating selection tooltip
+  isDefault?: boolean   
+  inTooltip: boolean    
 }
 
-// ── Default commands — seeded into chrome.storage on first run ────
+
 const DEFAULT_COMMANDS: CustomCommand[] = [
   { id: 'seren-solve',     label: 'Solve',      prompt: 'Solve or explain the following:',                          isDefault: true, inTooltip: true },
   { id: 'seren-summarize', label: 'Summarize',  prompt: 'Summarize the following in a clear and concise way:',       isDefault: true, inTooltip: true },
@@ -50,16 +49,6 @@ const DEFAULT_COMMANDS: CustomCommand[] = [
 
 const MAX_TOOLTIP_COMMANDS = 4
 
-// ── Storage bridge ──────────────────────────────────────────────
-// This page runs as a normal website (localhost:5173) and has no
-// direct access to chrome.storage. The Seren content script
-// (injected into every page, including this one) relays requests
-// to chrome.storage via window.postMessage.
-//
-// If the extension isn't installed, SEREN_BRIDGE_READY never
-// arrives — we fall back to localStorage so Settings still works,
-// it just won't be visible in the extension tooltip until the
-// extension is installed.
 
 const pendingRequests = new Map<string, (value: any) => void>()
 
@@ -84,7 +73,7 @@ function bridgeRequest(payload: any, timeoutMs = 600): Promise<any> {
     const requestId = Math.random().toString(36).slice(2)
     pendingRequests.set(requestId, resolve)
     window.postMessage({ source: 'seren-web', requestId, ...payload }, '*')
-    // If the extension isn't installed, nothing answers — fall back after a short wait
+    
     setTimeout(() => {
       if (pendingRequests.has(requestId)) {
         pendingRequests.delete(requestId)
@@ -97,13 +86,13 @@ function bridgeRequest(payload: any, timeoutMs = 600): Promise<any> {
 async function storageGet(key: string): Promise<any> {
   const value = await bridgeRequest({ type: 'SEREN_STORAGE_GET', key })
   if (value !== undefined) return value
-  // Fallback: extension not installed / bridge didn't respond in time
+  
   const raw = localStorage.getItem(key)
   return raw ? JSON.parse(raw) : undefined
 }
 
 async function storageSet(key: string, value: any): Promise<void> {
-  // Always write to localStorage too, so Settings still works standalone
+  
   localStorage.setItem(key, JSON.stringify(value))
   await bridgeRequest({ type: 'SEREN_STORAGE_SET', key, value })
 }
@@ -118,7 +107,7 @@ export default function Settings() {
     try { setUser(JSON.parse(raw)) } catch { navigate('/login') }
   }, [])
 
-  // ── Deadlines ─────────────────────────────────────────────────
+
   const [events, setEvents] = useState<Event[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
   const [pageError, setPageError] = useState<string | null>(null)
@@ -193,7 +182,7 @@ export default function Settings() {
     }
   }
 
-  // ── Account ───────────────────────────────────────────────────
+  
   const [newName, setNewName] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [oldPassword, setOldPassword] = useState('')
@@ -243,10 +232,7 @@ export default function Settings() {
       }
 
       if (passwordChanged) {
-        // The old token is still technically valid (JWTs can't be revoked
-        // server-side without extra infrastructure), but forcing a fresh
-        // login here at least makes sure this device re-authenticates
-        // with the new password right away.
+        
         localStorage.removeItem('seren_token')
         localStorage.removeItem('seren_user')
         navigate('/login', { state: { message: 'Password updated. Please log in again with your new password.' } })
@@ -291,7 +277,6 @@ export default function Settings() {
     navigate('/')
   }
 
-  // ── Commands (stored in chrome.storage, shared across popup/tooltip/web) ──
   const [commands, setCommands] = useState<CustomCommand[]>([])
   const [commandsLoading, setCommandsLoading] = useState(true)
   const [showCmdModal, setShowCmdModal] = useState(false)
@@ -301,22 +286,24 @@ export default function Settings() {
   const [tooltipLimitMsg, setTooltipLimitMsg] = useState(false)
 
   useEffect(() => {
+    if (!user) return
     (async () => {
-      const saved = await storageGet('seren_commands')
+      const key = `seren_commands_${user.id}`
+      const saved = await storageGet(key)
       if (saved && Array.isArray(saved) && saved.length > 0) {
         setCommands(saved)
       } else {
-        // First run — seed defaults
-        await storageSet('seren_commands', DEFAULT_COMMANDS)
+        
+        await storageSet(key, DEFAULT_COMMANDS)
         setCommands(DEFAULT_COMMANDS)
       }
       setCommandsLoading(false)
     })()
-  }, [])
+  }, [user])
 
   async function persistCommands(updated: CustomCommand[]) {
     setCommands(updated)
-    await storageSet('seren_commands', updated)
+    if (user) await storageSet(`seren_commands_${user.id}`, updated)
   }
 
   function openNewCmd() {
@@ -353,7 +340,7 @@ export default function Settings() {
 
   async function handleDeleteCmd(id: string) {
     const cmd = commands.find(c => c.id === id)
-    if (cmd?.isDefault) return // default commands can't be deleted, only hidden from tooltip
+    if (cmd?.isDefault) return 
     await persistCommands(commands.filter(c => c.id !== id))
   }
 
@@ -407,10 +394,10 @@ export default function Settings() {
 
       <div className="max-w-[1100px] mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
 
-        {/* LEFT */}
+        {}
         <div className="flex flex-col gap-6">
 
-          {/* Hero */}
+          {}
           <div className="bg-[#04342C] rounded-2xl p-7 text-white">
             <p className="text-xs text-white/40 uppercase tracking-widest font-medium mb-2">Settings</p>
             <h1 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[32px] font-normal leading-tight mb-1">
@@ -434,7 +421,7 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Deadlines */}
+          {}
           <div className="bg-white dark:bg-[#141F1C] rounded-2xl border border-[#E1F5EE] dark:border-white/10 p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[20px] text-[#04342C] dark:text-white font-normal">Upcoming deadlines</h2>
@@ -484,7 +471,7 @@ export default function Settings() {
             )}
           </div>
 
-          {/* Commands */}
+          {}
           <div className="bg-white dark:bg-[#141F1C] rounded-2xl border border-[#E1F5EE] dark:border-white/10 p-6">
             <div className="flex items-center justify-between mb-2">
               <div>
@@ -558,10 +545,10 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* RIGHT */}
+        {}
         <div className="flex flex-col gap-6">
 
-          {/* Get extension */}
+          {}
           <div className="bg-[#0F6E56] rounded-2xl p-6 text-white">
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-4">
               <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
@@ -576,7 +563,7 @@ export default function Settings() {
             </a>
           </div>
 
-          {/* Account */}
+          {}
           <div className="bg-white dark:bg-[#141F1C] rounded-2xl border border-[#E1F5EE] dark:border-white/10 p-6">
             <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[20px] text-[#04342C] dark:text-white font-normal mb-5">Account</h2>
             <form onSubmit={handleSaveAccount} className="flex flex-col gap-4">
@@ -609,7 +596,7 @@ export default function Settings() {
             </form>
           </div>
 
-          {/* Danger zone */}
+          {}
           <div className="bg-white dark:bg-[#141F1C] rounded-2xl border border-red-100 p-6">
             <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[18px] text-red-700 font-normal mb-1">Danger zone</h2>
             <p className="text-xs text-[#88877F] dark:text-white/40 mb-4">Permanently delete your account and all your data.</p>
@@ -637,7 +624,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Add deadline modal */}
+      {}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4">
           <div className="bg-white dark:bg-[#141F1C] rounded-2xl p-6 w-full max-w-[400px] shadow-2xl">
@@ -673,7 +660,7 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Command modal */}
+      {}
       {showCmdModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4">
           <div className="bg-white dark:bg-[#141F1C] rounded-2xl p-6 w-full max-w-[420px] shadow-2xl">
@@ -710,7 +697,7 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Logout confirmation */}
+      {}
       {showLogoutConfirm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4">
           <div className="bg-white dark:bg-[#141F1C] rounded-2xl p-6 w-full max-w-[360px] shadow-2xl">

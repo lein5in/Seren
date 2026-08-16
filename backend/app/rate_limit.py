@@ -2,13 +2,7 @@ import time
 from collections import defaultdict
 from fastapi import HTTPException
 
-# ========================
-# Simple in-memory sliding-window rate limiter
-# ========================
-# Not distributed, not persisted across restarts — fine at this scale.
-# If you ever run multiple backend instances behind a load balancer,
-# this needs to move to Redis (each instance would otherwise have its
-# own separate counters).
+
 
 _request_log: dict[str, list[float]] = defaultdict(list)
 
@@ -23,7 +17,7 @@ def rate_limit(key: str, max_requests: int, window_seconds: int) -> None:
     window_start = now - window_seconds
 
     timestamps = _request_log[key]
-    # Drop anything older than the window
+    
     while timestamps and timestamps[0] < window_start:
         timestamps.pop(0)
 

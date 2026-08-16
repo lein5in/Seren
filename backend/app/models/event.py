@@ -3,9 +3,6 @@ from typing import Optional
 from datetime import datetime
 from enum import Enum
 
-# ========================
-# Enums
-# ========================
 
 class EventType(str, Enum):
     assignment = "assignment"
@@ -21,9 +18,7 @@ class Priority(str, Enum):
     high = "high"
     urgent = "urgent"
 
-# ========================
-# Event Models
-# ========================
+
 
 class EventBase(BaseModel):
     title: str
@@ -31,7 +26,7 @@ class EventBase(BaseModel):
     event_type: EventType = EventType.assignment
     priority: Priority = Priority.medium
     deadline: datetime
-    course: Optional[str] = None             # e.g. "MAT1320", "CSI2110"
+    course: Optional[str] = None             
 
 class EventCreate(EventBase):
     user_id: int

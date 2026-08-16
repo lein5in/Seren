@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react'
 
-// ── Types ──
+
 type Lang = 'en' | 'fr'
 
 interface LangContextType {
@@ -9,10 +9,9 @@ interface LangContextType {
   t: (en: string, fr: string) => string
 }
 
-// ── Context ──
+
 const LangContext = createContext<LangContextType | undefined>(undefined)
 
-// ── Provider ──
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Lang>('en')
 
@@ -27,7 +26,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
   )
 }
 
-// ── Hook ──
+
 export function useLang(): LangContextType {
   const context = useContext(LangContext)
   if (!context) throw new Error('useLang must be used within a LangProvider')

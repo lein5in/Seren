@@ -57,7 +57,7 @@ export default function Features() {
   return (
     <section id="features" className="py-24 px-[5%]" ref={sectionRef}>
 
-      {/* Header */}
+      {}
       <div className="reveal opacity-0 translate-y-8 transition-all duration-700">
         <p className="text-xs tracking-[3px] text-[#1D9E75] font-medium mb-4 uppercase">
           {t('FEATURES', 'FONCTIONNALITÉS')}
@@ -78,7 +78,7 @@ export default function Features() {
         </p>
       </div>
 
-      {/* Grid */}
+      {}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {features.map((f, i) => (
           <div
@@ -86,7 +86,7 @@ export default function Features() {
             className="reveal opacity-0 translate-y-8 transition-all duration-700 bg-white border border-[#E1F5EE] rounded-2xl p-8 group hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(15,110,86,0.1)] hover:border-[#9FE1CB] relative overflow-hidden cursor-default"
             style={{ transitionDelay: `${(i % 3) * 100}ms` }}
           >
-            {/* Bottom bar on hover */}
+            {}
             <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#5DCAA5] to-[#9FE1CB] scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
 
             <div className="w-12 h-12 bg-[#E1F5EE] rounded-2xl flex items-center justify-center text-[22px] mb-5">

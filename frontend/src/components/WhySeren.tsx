@@ -45,7 +45,7 @@ export default function WhySeren() {
   return (
     <section id="why" className="py-24 px-[5%] bg-[#F8F8F6]" ref={sectionRef}>
 
-      {/* Header */}
+      {}
       <div className="reveal opacity-0 translate-y-8 transition-all duration-700">
         <p className="text-xs tracking-[3px] text-[#1D9E75] font-medium mb-4 uppercase">
           {t('WHY SEREN', 'POURQUOI SEREN')}
@@ -58,10 +58,10 @@ export default function WhySeren() {
         </h2>
       </div>
 
-      {/* Content grid */}
+      {}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
-        {/* Stats */}
+        {}
         <div className="grid grid-cols-2 gap-6">
           {stats.map((s, i) => (
             <div
@@ -75,7 +75,7 @@ export default function WhySeren() {
           ))}
         </div>
 
-        {/* Quote */}
+        {}
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 delay-200 bg-[#085041] rounded-2xl p-10">
           <p className="font-display text-[22px] italic leading-relaxed text-[#9FE1CB] mb-6">
             {t(

@@ -1,14 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import { API_BASE } from '../config'
 
-const API_BASE = 'https://seren-production-834b.up.railway.app'
+type MessageType = 'text' | 'flashcards' | 'quiz' | 'visual'
 
 type Message = {
-  role: 'user' | 'seren'
+  id?: number
+  role: 'user' | 'assistant'
   content: string
-  type?: 'text' | 'flashcards' | 'quiz' | 'visual'
+  type: MessageType
   data?: any
+  sequence?: number
+}
+
+type Conversation = {
+  id: number
+  title: string
+  archived: boolean
+  created_at: string
+  updated_at: string
 }
 
 type Event = {
@@ -22,6 +34,10 @@ type CustomCommand = {
   id: string
   label: string
   prompt: string
+}
+
+function commandsKey(userId: number | string) {
+  return `seren_commands_${userId}`
 }
 
 function getDaysUntil(deadline: string) {
@@ -44,7 +60,16 @@ function getUrgencyColor(days: number) {
   return 'bg-[#5DCAA5]'
 }
 
-// ── Storage bridge (same mechanism as Settings.tsx) ────────────────
+function formatConversationDate(iso: string) {
+  const date = new Date(iso)
+  const now = new Date()
+  const days = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days}d ago`
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 const pendingRequests = new Map<string, (value: any) => void>()
 
 if (typeof window !== 'undefined') {
@@ -83,7 +108,6 @@ async function bridgeStorageGet(key: string): Promise<any> {
   return raw ? JSON.parse(raw) : undefined
 }
 
-// ── Flashcards ────────────────────────────────────────────────────
 function FlashcardsBlock({ data }: { data: any }) {
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
@@ -120,7 +144,6 @@ function FlashcardsBlock({ data }: { data: any }) {
   )
 }
 
-// ── Quiz ──────────────────────────────────────────────────────────
 function QuizBlock({ data }: { data: any }) {
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
@@ -192,7 +215,6 @@ function QuizBlock({ data }: { data: any }) {
   )
 }
 
-// ── Visual ────────────────────────────────────────────────────────
 function VisualBlock({ html }: { html: string }) {
   const [expanded, setExpanded] = useState(false)
   return (
@@ -219,33 +241,54 @@ function VisualBlock({ html }: { html: string }) {
   )
 }
 
-// ── Main Chat ─────────────────────────────────────────────────────
+function mapApiMessage(m: any): Message {
+  return {
+    id: m.id,
+    role: m.role,
+    content: m.content || '',
+    type: m.type,
+    data: m.data,
+    sequence: m.sequence
+  }
+}
+
 export default function Chat() {
   const navigate = useNavigate()
   const [user, setUser] = useState<{ id: number; name: string; email: string } | null>(null)
+  const [token, setToken] = useState<string | null>(null)
+
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
+  const [conversationsLoading, setConversationsLoading] = useState(true)
+
   const [messages, setMessages] = useState<Message[]>([])
+  const [messagesLoading, setMessagesLoading] = useState(false)
+
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [events, setEvents] = useState<Event[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const [attachedFile, setAttachedFile] = useState<string | null>(null) // chip in input bar
+  const [attachedFile, setAttachedFile] = useState<string | null>(null)
   const [customCommands, setCustomCommands] = useState<CustomCommand[]>([])
   const [darkMode, setDarkMode] = useState<boolean>(() => localStorage.getItem('seren_dark') === '1')
-  const [sidebarOpen, setSidebarOpen] = useState(false) // mobile overlay sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const touchStartX = useRef<number | null>(null)
   const touchStartY = useRef<number | null>(null)
   const draggingRef = useRef<'opening' | 'closing' | null>(null)
-  const [dragX, setDragX] = useState<number | null>(null) // live px offset while finger is down, null = not dragging
+  const [dragX, setDragX] = useState<number | null>(null)
   const SIDEBAR_WIDTH = 260
 
-  // ── Swipe gesture — the sidebar follows the finger in real time,
-  // then snaps open/closed on release depending on how far it moved.
-  // Touch-only, so it's a no-op on desktop (no touch events fire there).
+  function authHeaders(json = true) {
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}` }
+    if (json) headers['Content-Type'] = 'application/json'
+    return headers
+  }
+
   function handleTouchStart(e: React.TouchEvent) {
     const x = e.touches[0].clientX
     touchStartX.current = x
@@ -259,9 +302,9 @@ export default function Chat() {
     if (!draggingRef.current || touchStartX.current === null) return
     const deltaX = e.touches[0].clientX - touchStartX.current
     if (draggingRef.current === 'opening') {
-      setDragX(Math.min(Math.max(deltaX, 0), SIDEBAR_WIDTH) - SIDEBAR_WIDTH) // -260 → 0
+      setDragX(Math.min(Math.max(deltaX, 0), SIDEBAR_WIDTH) - SIDEBAR_WIDTH)
     } else {
-      setDragX(Math.min(Math.max(deltaX, -SIDEBAR_WIDTH), 0)) // 0 → -260
+      setDragX(Math.min(Math.max(deltaX, -SIDEBAR_WIDTH), 0))
     }
   }
 
@@ -275,76 +318,107 @@ export default function Chat() {
     draggingRef.current = null
     touchStartX.current = null
     touchStartY.current = null
-    setDragX(null) // let the CSS transition take over for the final snap
+    setDragX(null)
 
-    if (Math.abs(deltaY) > Math.abs(deltaX)) return // vertical scroll, ignore
+    if (Math.abs(deltaY) > Math.abs(deltaX)) return
     const SWIPE_THRESHOLD = 60
     if (wasOpening && deltaX > SWIPE_THRESHOLD) setSidebarOpen(true)
     else if (!wasOpening && deltaX < -SWIPE_THRESHOLD) setSidebarOpen(false)
   }
 
-  // ── Dark mode ────────────────────────────────────────────────
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
     localStorage.setItem('seren_dark', darkMode ? '1' : '0')
   }, [darkMode])
 
-  // ── Load user ─────────────────────────────────────────────────
   useEffect(() => {
     const raw = localStorage.getItem('seren_user')
-    if (!raw) { navigate('/login'); return }
+    const savedToken = localStorage.getItem('seren_token')
+    if (!raw || !savedToken) { navigate('/login'); return }
     try {
-      const u = JSON.parse(raw)
-      setUser(u)
-      const h = new Date().getHours()
-      const greeting = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
-      const welcome: Message = { role: 'seren', type: 'text', content: `${greeting}, ${u.name.split(' ')[0]} 👋 What do you want to work on today?` }
-      const saved = localStorage.getItem('seren_chat_history')
-      if (saved) {
-        try { setMessages(JSON.parse(saved)) } catch { setMessages([welcome]) }
-      } else {
-        setMessages([welcome])
-      }
+      setUser(JSON.parse(raw))
+      setToken(savedToken)
     } catch { navigate('/login') }
   }, [])
 
-  // ── Load custom commands ──────────────────────────────────────
-  useEffect(() => {
-    (async () => {
-      const saved = await bridgeStorageGet('seren_commands')
-      if (saved && Array.isArray(saved)) setCustomCommands(saved)
-    })()
-  }, [])
+  async function loadConversations(preferredId?: number) {
+    if (!token) return
+    setConversationsLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/conversations/`, { headers: authHeaders(false) })
+      if (!res.ok) throw new Error()
+      const data: Conversation[] = await res.json()
+      setConversations(data)
+      if (preferredId && data.some(c => c.id === preferredId)) {
+        setActiveConversationId(preferredId)
+      } else if (data.length > 0) {
+        setActiveConversationId(data[0].id)
+      } else {
+        await createConversation()
+      }
+    } catch {
+      setConversations([])
+    }
+    setConversationsLoading(false)
+  }
 
-  // ── Load events ───────────────────────────────────────────────
+  async function createConversation() {
+    if (!token) return
+    try {
+      const res = await fetch(`${API_BASE}/conversations/`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ title: 'New conversation' })
+      })
+      if (!res.ok) throw new Error()
+      const conv: Conversation = await res.json()
+      setConversations(prev => [conv, ...prev])
+      setActiveConversationId(conv.id)
+      setMessages([])
+      setAttachedFile(null)
+    } catch {}
+  }
+
+  useEffect(() => {
+    if (token) loadConversations()
+  }, [token])
+
+  async function loadMessages(conversationId: number) {
+    setMessagesLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/conversations/${conversationId}`, { headers: authHeaders(false) })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setMessages((data.messages || []).map(mapApiMessage))
+    } catch {
+      setMessages([])
+    }
+    setMessagesLoading(false)
+  }
+
+  useEffect(() => {
+    if (activeConversationId !== null) loadMessages(activeConversationId)
+  }, [activeConversationId])
+
   useEffect(() => {
     if (!user) return
-    const token = localStorage.getItem('seren_token')
-    fetch(`${API_BASE}/events/user/${user.id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    (async () => {
+      const saved = await bridgeStorageGet(commandsKey(user.id))
+      if (saved && Array.isArray(saved)) setCustomCommands(saved)
+    })()
+  }, [user])
+
+  useEffect(() => {
+    if (!user || !token) return
+    fetch(`${API_BASE}/events/user/${user.id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(data => setEvents(Array.isArray(data) ? data.filter((e: Event) => getDaysUntil(e.deadline) >= 0) : []))
       .catch(() => {})
-  }, [user])
-
-  // ── Persist chat ──────────────────────────────────────────────
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem('seren_chat_history', JSON.stringify(messages))
-    }
-  }, [messages])
+  }, [user, token])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
-
-  function handleNewChat() {
-    const welcome: Message = { role: 'seren', type: 'text', content: 'What do you want to work on?' }
-    setMessages([welcome])
-    localStorage.setItem('seren_chat_history', JSON.stringify([welcome]))
-    setAttachedFile(null)
-  }
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
@@ -354,7 +428,6 @@ export default function Chat() {
     navigate('/')
   }
 
-  // ── Edit a past user message ────────────────────────────────────
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
 
@@ -368,17 +441,27 @@ export default function Chat() {
     setEditText('')
   }
 
-  function submitEdit() {
-    if (editingIndex === null || !editText.trim()) return
-    const trimmedHistory = messages.slice(0, editingIndex)
-    setMessages(trimmedHistory)
+  async function submitEdit() {
+    if (editingIndex === null || !editText.trim() || !activeConversationId) return
+    const editedMessage = messages[editingIndex]
+    const sequenceToDeleteFrom = editedMessage.sequence
+
+    if (sequenceToDeleteFrom !== undefined) {
+      try {
+        await fetch(`${API_BASE}/conversations/${activeConversationId}/messages/from/${sequenceToDeleteFrom}`, {
+          method: 'DELETE',
+          headers: authHeaders(false)
+        })
+      } catch {}
+    }
+
+    setMessages(messages.slice(0, editingIndex))
     const newText = editText
     setEditingIndex(null)
     setEditText('')
-    sendMessage(newText, { historyOverride: trimmedHistory })
+    sendMessage(newText)
   }
 
-  // ── Paste into input ──────────────────────────────────────────
   function pasteIntoInput(text: string) {
     setInput(text)
     setTimeout(() => {
@@ -387,7 +470,6 @@ export default function Chat() {
     }, 50)
   }
 
-  // ── Export PDF ────────────────────────────────────────────────
   function exportToPDF(text: string) {
     import('jspdf').then(({ jsPDF }) => {
       const doc = new jsPDF()
@@ -404,97 +486,85 @@ export default function Chat() {
     })
   }
 
-  // ── Send message (streamed via SSE) ─────────────────────────────
-  async function sendMessage(text: string, opts?: { skipUserMessage?: boolean; historyOverride?: Message[] }) {
-    if (!text.trim() || !user) return
-    if (!opts?.skipUserMessage) {
-      setMessages(prev => [...prev, { role: 'user', type: 'text', content: text }])
+  async function consumeStream(response: Response, assistantIndex: number) {
+    if (!response.ok || !response.body) {
+      if (response.status === 429) throw new Error('RATE_LIMIT')
+      if (response.status === 401 || response.status === 403) throw new Error('AUTH_EXPIRED')
+      if (response.status >= 500) throw new Error('SERVER_ERROR')
+      throw new Error('Stream failed')
     }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let accumulated = ''
+    setLoading(false)
+
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const chunks = buffer.split('\n\n')
+      buffer = chunks.pop() || ''
+
+      for (const raw of chunks) {
+        if (!raw.startsWith('data: ')) continue
+        const json = JSON.parse(raw.slice(6))
+
+        if (json.event === 'token') {
+          accumulated += json.text
+          const snapshot = accumulated
+          setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: snapshot } : m))
+        } else if (json.event === 'complete') {
+          setMessages(prev => prev.map((m, i) => i === assistantIndex
+            ? { ...m, type: json.type, content: '', data: json.data }
+            : m))
+        } else if (json.event === 'error') {
+          setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: json.message || 'Something went wrong.' } : m))
+        }
+      }
+    }
+
+    return accumulated
+  }
+
+  async function sendMessage(text: string) {
+    if (!text.trim() || !user || !activeConversationId) return
+    setMessages(prev => [...prev, { role: 'user', type: 'text', content: text }])
     setInput('')
     setAttachedFile(null)
     setLoading(true)
     setStreaming(true)
 
-    const token = localStorage.getItem('seren_token')
-    const sourceMessages = opts?.historyOverride ?? messages
-    const history = sourceMessages
-      .filter(m => m.type === 'text' && m.content)
-      .map(m => ({ role: m.role === 'seren' ? 'assistant' : 'user', content: m.content }))
-
     const controller = new AbortController()
     abortControllerRef.current = controller
 
-    // Placeholder message that fills in as tokens arrive
     let assistantIndex = -1
     setMessages(prev => {
       assistantIndex = prev.length
-      return [...prev, { role: 'seren', type: 'text', content: '' }]
+      return [...prev, { role: 'assistant', type: 'text', content: '' }]
     })
-
-    let accumulated = ''
 
     try {
       const res = await fetch(`${API_BASE}/ai/chat/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: text, user_id: user.id, conversation_history: history }),
+        headers: authHeaders(),
+        body: JSON.stringify({ conversation_id: activeConversationId, message: text }),
         signal: controller.signal
       })
-
-      if (!res.ok || !res.body) {
-        if (res.status === 429) throw new Error('RATE_LIMIT')
-        if (res.status === 401 || res.status === 403) throw new Error('AUTH_EXPIRED')
-        if (res.status >= 500) throw new Error('SERVER_ERROR')
-        throw new Error('Stream failed')
-      }
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      setLoading(false) // tokens are arriving — drop the "..." loading dots
-
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const events = buffer.split('\n\n')
-        buffer = events.pop() || ''
-
-        for (const raw of events) {
-          if (!raw.startsWith('data: ')) continue
-          const json = JSON.parse(raw.slice(6))
-
-          if (json.event === 'token') {
-            accumulated += json.text
-            const snapshot = accumulated
-            setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: snapshot } : m))
-          } else if (json.event === 'complete') {
-            setMessages(prev => prev.map((m, i) => i === assistantIndex
-              ? { role: 'seren', type: json.type, content: '', data: json.data }
-              : m))
-          } else if (json.event === 'error') {
-            setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: json.message || 'Something went wrong.' } : m))
-          }
-        }
-      }
+      await consumeStream(res, assistantIndex)
+      setConversations(prev => {
+        const updated = prev.map(c => c.id === activeConversationId ? { ...c, updated_at: new Date().toISOString() } : c)
+        return updated.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      })
     } catch (err: any) {
       if (err?.name === 'AbortError') {
-        // User hit stop — keep whatever text streamed in so far
-        if (!accumulated) {
-          setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: '_(stopped)_' } : m))
-        }
+        setMessages(prev => prev.map((m, i) => i === assistantIndex && !m.content ? { ...m, content: '_(stopped)_' } : m))
       } else {
         let msg = 'Could not reach Seren. Is the backend running?'
-        if (err?.message === 'RATE_LIMIT') {
-          msg = "You're sending messages a bit too fast — wait a few seconds and try again."
-        } else if (err?.message === 'AUTH_EXPIRED') {
-          msg = 'Your session expired. Please log out and log back in.'
-        } else if (err?.message === 'SERVER_ERROR') {
-          msg = 'Seren ran into a problem on the server side. Try again in a moment.'
-        } else if (!accumulated && err?.name === 'TypeError') {
-          // Most browsers throw a generic TypeError for network failures / CORS / server unreachable
-          msg = 'Could not reach Seren — check your connection or that the backend is running.'
-        }
+        if (err?.message === 'RATE_LIMIT') msg = "You're sending messages a bit too fast — wait a few seconds and try again."
+        else if (err?.message === 'AUTH_EXPIRED') msg = 'Your session expired. Please log out and log back in.'
+        else if (err?.message === 'SERVER_ERROR') msg = 'Seren ran into a problem on the server side. Try again in a moment.'
         setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: msg } : m))
       }
     } finally {
@@ -508,13 +578,38 @@ export default function Chat() {
     abortControllerRef.current?.abort()
   }
 
-  function regenerate() {
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
-    if (!lastUserMsg) return
-    const idx = messages.map(m => m.role).lastIndexOf('user')
-    const trimmed = idx >= 0 ? messages.slice(0, idx + 1) : messages
+  async function regenerate() {
+    if (!activeConversationId) return
+    const lastAssistantIsTrailing = messages.length > 0 && messages[messages.length - 1].role === 'assistant'
+    const trimmed = lastAssistantIsTrailing ? messages.slice(0, -1) : messages
     setMessages(trimmed)
-    sendMessage(lastUserMsg.content, { skipUserMessage: true, historyOverride: trimmed.slice(0, -1) })
+    setLoading(true)
+    setStreaming(true)
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    let assistantIndex = -1
+    setMessages(prev => {
+      assistantIndex = prev.length
+      return [...prev, { role: 'assistant', type: 'text', content: '' }]
+    })
+
+    try {
+      const res = await fetch(`${API_BASE}/ai/chat/regenerate/stream`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ conversation_id: activeConversationId }),
+        signal: controller.signal
+      })
+      await consumeStream(res, assistantIndex)
+    } catch {
+      setMessages(prev => prev.map((m, i) => i === assistantIndex ? { ...m, content: 'Could not regenerate. Try again.' } : m))
+    } finally {
+      setLoading(false)
+      setStreaming(false)
+      abortControllerRef.current = null
+    }
   }
 
   function copyMessage(text: string, index: number) {
@@ -524,17 +619,15 @@ export default function Chat() {
     })
   }
 
-  // ── File upload → chip in input bar ──────────────────────────
   async function handleFileUpload(file: File) {
-    if (!user) return
-    const token = localStorage.getItem('seren_token')
+    if (!user || !activeConversationId) return
     setLoading(true)
 
     const formData = new FormData()
     formData.append('file', file)
 
     try {
-      const res = await fetch(`${API_BASE}/upload/pdf/${user.id}`, {
+      const res = await fetch(`${API_BASE}/upload/pdf/${activeConversationId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -542,25 +635,39 @@ export default function Chat() {
       const data = await res.json()
       setLoading(false)
       if (res.ok) {
-        // Show chip in input bar
         setAttachedFile(data.filename)
-        // Confirm in chat
         setMessages(prev => [...prev, {
-          role: 'seren', type: 'text',
+          role: 'assistant', type: 'text',
           content: `I've read **${data.filename}** (${data.characters.toLocaleString()} characters). What would you like to do with it?`
         }])
-        // Pre-fill input
         pasteIntoInput(`I've uploaded "${data.filename}". `)
       } else {
-        setMessages(prev => [...prev, { role: 'seren', type: 'text', content: `Couldn't read that PDF: ${data.detail}` }])
+        setMessages(prev => [...prev, { role: 'assistant', type: 'text', content: `Couldn't read that PDF: ${data.detail}` }])
       }
     } catch {
       setLoading(false)
-      setMessages(prev => [...prev, { role: 'seren', type: 'text', content: 'Upload failed. Is the backend running?' }])
+      setMessages(prev => [...prev, { role: 'assistant', type: 'text', content: 'Upload failed. Is the backend running?' }])
     }
   }
 
-  if (!user) return null
+  async function deleteConversation(id: number, e: React.MouseEvent) {
+    e.stopPropagation()
+    try {
+      await fetch(`${API_BASE}/conversations/${id}`, { method: 'DELETE', headers: authHeaders(false) })
+    } catch {}
+    const remaining = conversations.filter(c => c.id !== id)
+    setConversations(remaining)
+    if (activeConversationId === id) {
+      if (remaining.length > 0) setActiveConversationId(remaining[0].id)
+      else await createConversation()
+    }
+  }
+
+  if (!user || conversationsLoading) return null
+
+  const greetingName = user.name.split(' ')[0]
+  const h = new Date().getHours()
+  const greetingWord = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
 
   return (
     <div
@@ -571,7 +678,6 @@ export default function Chat() {
       onTouchEnd={handleTouchEnd}
     >
 
-      {/* Mobile backdrop — closes sidebar on tap outside, fades in live while dragging */}
       {(sidebarOpen || (dragX !== null && dragX > -SIDEBAR_WIDTH)) && (
         <div
           className="fixed inset-0 bg-black/40 z-30 md:hidden"
@@ -580,13 +686,11 @@ export default function Chat() {
         />
       )}
 
-      {/* ── SIDEBAR ── */}
       <aside
         className={`w-[260px] min-w-[260px] h-full bg-[#04342C] flex flex-col overflow-hidden fixed md:static inset-y-0 left-0 z-40 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
         style={dragX !== null ? { transform: `translateX(${dragX}px)`, transition: 'none' } : undefined}
       >
 
-        {/* Logo */}
         <div className="px-5 pt-5 pb-4 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-2.5">
             <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
@@ -606,17 +710,15 @@ export default function Chat() {
           </button>
         </div>
 
-        {/* Greeting */}
         <div className="px-5 py-4 border-b border-white/10">
           <p className="text-[10px] text-white/35 uppercase tracking-widest font-medium mb-1">Good to see you,</p>
           <p style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[22px] text-white font-normal leading-tight">
-            {user.name.split(' ')[0]}
+            {greetingName}
           </p>
         </div>
 
-        {/* New chat */}
         <div className="px-4 pt-4">
-          <button onClick={handleNewChat}
+          <button onClick={createConversation}
             className="w-full flex items-center gap-2 px-3 py-2.5 bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl text-sm text-white/80 font-medium transition-all cursor-pointer">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -625,7 +727,28 @@ export default function Chat() {
           </button>
         </div>
 
-        {/* Custom commands */}
+        <div className="px-5 pt-5">
+          <p className="text-[9px] text-white/25 uppercase tracking-widest font-semibold mb-2">Conversations</p>
+          <div className="flex flex-col gap-0.5 max-h-[180px] overflow-y-auto">
+            {conversations.map(conv => (
+              <div key={conv.id}
+                onClick={() => { setActiveConversationId(conv.id); setSidebarOpen(false) }}
+                className={`group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all ${
+                  conv.id === activeConversationId ? 'bg-white/12' : 'hover:bg-white/07'
+                }`}>
+                <span className="flex-1 min-w-0 truncate text-xs text-white/70">{conv.title}</span>
+                <span className="text-[9px] text-white/25 flex-shrink-0">{formatConversationDate(conv.updated_at)}</span>
+                <button onClick={(e) => deleteConversation(conv.id, e)}
+                  className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-300 bg-transparent border-none cursor-pointer flex-shrink-0 p-0.5 transition-all">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {customCommands.length > 0 && (
           <div className="px-5 pt-5">
             <p className="text-[9px] text-white/25 uppercase tracking-widest font-semibold mb-2">My commands</p>
@@ -642,7 +765,6 @@ export default function Chat() {
           </div>
         )}
 
-        {/* Upcoming deadlines */}
         <div className="px-5 pt-5 flex-1 overflow-y-auto">
           <p className="text-[9px] text-white/25 uppercase tracking-widest font-semibold mb-3">Upcoming</p>
           {events.length === 0 ? (
@@ -663,7 +785,6 @@ export default function Chat() {
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-4 py-4 border-t border-white/10 flex flex-col gap-1">
           <button onClick={() => setDarkMode(d => !d)}
             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-white/45 hover:text-white/80 hover:bg-white/07 transition-all cursor-pointer border-none bg-transparent w-full text-left">
@@ -696,10 +817,8 @@ export default function Chat() {
         </div>
       </aside>
 
-      {/* ── MAIN ── */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
 
-        {/* Header */}
         <header className="h-[56px] flex items-center justify-between px-4 md:px-6 border-b border-[#EEEEEC] dark:border-white/10 bg-white dark:bg-[#0F1A17] flex-shrink-0 transition-colors">
           <button onClick={() => setSidebarOpen(true)}
             className="md:hidden text-[#88877F] dark:text-white/50 hover:text-[#2C2C2A] dark:hover:text-white bg-transparent border-none cursor-pointer p-1">
@@ -710,12 +829,29 @@ export default function Chat() {
           <p className="text-xs text-[#AEADA8] dark:text-white/30 ml-auto">Seren · your study companion</p>
         </header>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 flex flex-col gap-4">
+          {messagesLoading ? (
+            <div className="flex justify-start">
+              <div className="bg-white dark:bg-[#141F1C] border border-[#EEEEEC] dark:border-white/10 rounded-2xl rounded-bl-sm px-4 py-3">
+                <div className="flex gap-1 items-center">
+                  {[0, 1, 2].map(i => (
+                    <span key={i} className="w-1.5 h-1.5 bg-[#5DCAA5] rounded-full opacity-40 animate-bounce" style={{ animationDelay: `${i * 0.18}s` }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex justify-start">
+              <div className="bg-white dark:bg-[#141F1C] border border-[#EEEEEC] dark:border-white/10 text-[#2C2C2A] dark:text-white/90 rounded-2xl rounded-bl-sm px-4 py-3 text-sm">
+                {greetingWord}, {greetingName} 👋 What do you want to work on today?
+              </div>
+            </div>
+          ) : null}
+
           {messages.map((msg, i) => {
-            const isLastSeren = msg.role === 'seren' && i === messages.length - 1
+            const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1
             return (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div key={msg.id ?? i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {msg.type === 'flashcards' && msg.data ? (
                 <div className="w-full max-w-[520px]"><FlashcardsBlock data={msg.data} /></div>
               ) : msg.type === 'quiz' && msg.data ? (
@@ -753,9 +889,9 @@ export default function Chat() {
                     ? 'bg-[#085041] text-white rounded-br-sm'
                     : 'bg-white dark:bg-[#141F1C] border border-[#EEEEEC] dark:border-white/10 text-[#2C2C2A] dark:text-white/90 rounded-bl-sm'
                 }`}>
-                  {msg.role === 'seren' ? (
+                  {msg.role === 'assistant' ? (
                     <>
-                      <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) as string }} className="prose-seren" />
+                      <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(msg.content) as string) }} className="prose-seren" />
                       {msg.content.length > 150 && (
                         <button onClick={() => exportToPDF(msg.content)}
                           className="mt-2 flex items-center gap-1 text-[10px] text-[#AEADA8] hover:text-[#0F6E56] transition-colors bg-transparent border-none cursor-pointer px-0 font-sans">
@@ -782,7 +918,7 @@ export default function Chat() {
                     Edit
                   </button>
                 )}
-                {msg.role === 'seren' && msg.content && (
+                {msg.role === 'assistant' && msg.content && (
                   <div className="flex items-center gap-3 px-1">
                     <button onClick={() => copyMessage(msg.content, i)}
                       className="flex items-center gap-1 text-[10px] text-[#AEADA8] dark:text-white/30 hover:text-[#0F6E56] dark:hover:text-[#5DCAA5] transition-colors bg-transparent border-none cursor-pointer px-0 font-sans">
@@ -791,7 +927,7 @@ export default function Chat() {
                       </svg>
                       {copiedIndex === i ? 'Copied' : 'Copy'}
                     </button>
-                    {isLastSeren && !streaming && (
+                    {isLastAssistant && !streaming && (
                       <button onClick={regenerate}
                         className="flex items-center gap-1 text-[10px] text-[#AEADA8] dark:text-white/30 hover:text-[#0F6E56] dark:hover:text-[#5DCAA5] transition-colors bg-transparent border-none cursor-pointer px-0 font-sans">
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -823,10 +959,8 @@ export default function Chat() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input zone — chip lives here */}
         <div className="border-t border-[#EEEEEC] dark:border-white/10 bg-white dark:bg-[#0F1A17] flex-shrink-0 transition-colors">
 
-          {/* File chip — shown inside input zone when file attached */}
           {attachedFile && (
             <div className="px-6 pt-3">
               <div className="inline-flex items-center gap-1.5 bg-[#EBF7F2] border border-[#C8F0E3] text-[#0F6E56] text-xs font-medium px-2.5 py-1.5 rounded-lg">
@@ -881,12 +1015,11 @@ export default function Chat() {
         </div>
       </main>
 
-      {/* Logout confirmation */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4">
           <div className="bg-white dark:bg-[#141F1C] rounded-2xl p-6 w-full max-w-[360px] shadow-2xl">
             <h2 style={{ fontFamily: 'DM Serif Display, serif' }} className="text-[19px] text-[#04342C] dark:text-white font-normal mb-2">Log out?</h2>
-            <p className="text-sm text-[#88877F] dark:text-white/40 mb-5">You'll need to log back in to access your conversation and deadlines.</p>
+            <p className="text-sm text-[#88877F] dark:text-white/40 mb-5">You'll need to log back in to access your conversations and deadlines.</p>
             <div className="flex gap-3">
               <button onClick={handleLogout}
                 className="flex-1 bg-[#0F6E56] hover:bg-[#085041] text-white text-sm font-medium py-2.5 rounded-xl border-none cursor-pointer transition-colors font-sans">

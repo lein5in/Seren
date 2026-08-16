@@ -51,7 +51,7 @@ export default function HowItWorks() {
   return (
     <section id="how" className="py-24 px-[5%] bg-[#085041]" ref={sectionRef}>
 
-      {/* Header */}
+      {}
       <div className="reveal opacity-0 translate-y-8 transition-all duration-700">
         <p className="text-xs tracking-[3px] text-[#5DCAA5] font-medium mb-4 uppercase">
           {t('HOW IT WORKS', 'COMMENT ÇA MARCHE')}
@@ -72,10 +72,10 @@ export default function HowItWorks() {
         </p>
       </div>
 
-      {/* Steps */}
+      {}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 relative">
 
-        {/* Connector line (desktop only) */}
+        {}
         <div className="hidden lg:block absolute top-8 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-[#1D9E75] to-transparent" />
 
         {steps.map((step, i) => (

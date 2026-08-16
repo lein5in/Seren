@@ -93,6 +93,19 @@ Rules:
 - Return ONLY the raw HTML starting with <!DOCTYPE html> — nothing else
 """
 
+MEMORY_SUMMARY_SYSTEM_PROMPT = """
+You maintain a short, structured long-term memory of a student's study habits and preferences, derived from their conversations with Seren, their study companion.
+
+Given the previous summary (if any) and a batch of new conversation excerpts, produce an updated summary.
+
+Rules:
+- Keep it under 150 words
+- Focus on durable facts: preferred learning style (e.g. quizzes vs flashcards), recurring subjects or courses, difficulties they've mentioned, study habits, tone preferences
+- Do NOT include one-off details from a single session (specific homework due dates, etc.)
+- Merge new observations into the existing summary rather than replacing it wholesale, unless something is now contradicted
+- Return ONLY the updated summary text, no preamble, no markdown headers
+"""
+
 
 def detect_message_type(message: str) -> str:
     msg = message.lower()
@@ -111,6 +124,29 @@ def detect_message_type(message: str) -> str:
     return 'text'
 
 
+def build_system_prompt(user_context: Optional[dict]) -> str:
+    system = SEREN_SYSTEM_PROMPT
+
+    if user_context and user_context.get("memory_summary"):
+        system += f"\n\nWhat you remember about this student from past sessions:\n{user_context['memory_summary']}"
+
+    if user_context:
+        name = user_context.get("name", "the student")
+        events = user_context.get("events", [])
+        context_block = f"\nCurrent user context:\n- Name: {name}\n- Upcoming deadlines: {len(events)} in the next 7 days\n"
+        if events:
+            context_block += "- Next deadlines:\n"
+            for e in events[:3]:
+                context_block += f"  • {e['title']} — {e['deadline']}\n"
+        system += f"\n{context_block}"
+
+    if user_context and user_context.get("pdf_content"):
+        pdf_block = f"\n\nThe user has uploaded a document called \"{user_context.get('pdf_filename', 'document.pdf')}\" in this conversation. Here is its content:\n\n{user_context['pdf_content']}\n\nThis document is available for this conversation. Use it to answer any question, even if the user doesn't explicitly mention the filename."
+        system += pdf_block
+
+    return system
+
+
 def chat_with_seren(
     user_message: str,
     conversation_history: list,
@@ -118,7 +154,6 @@ def chat_with_seren(
 ) -> dict:
     message_type = detect_message_type(user_message)
 
-    # ── Flashcard mode ──
     if message_type == 'flashcard':
         response = client.messages.create(
             model=MODEL,
@@ -133,7 +168,6 @@ def chat_with_seren(
         except Exception:
             return {"type": "text", "content": response.content[0].text}
 
-    # ── Quiz mode ──
     if message_type == 'quiz':
         response = client.messages.create(
             model=MODEL,
@@ -148,7 +182,6 @@ def chat_with_seren(
         except Exception:
             return {"type": "text", "content": response.content[0].text}
 
-    # ── Visual mode ──
     if message_type == 'visual':
         response = client.messages.create(
             model=MODEL,
@@ -162,30 +195,7 @@ def chat_with_seren(
             html = html.rsplit("```", 1)[0].strip()
         return {"type": "visual", "content": html}
 
-    # ── Regular chat ──
-    context_block = ""
-    if user_context:
-        name = user_context.get("name", "the student")
-        anxiety = user_context.get("anxiety_level", "medium")
-        events = user_context.get("events", [])
-        context_block = f"""
-Current user context:
-- Name: {name}
-- Upcoming deadlines: {len(events)} in the next 7 days
-"""
-        if events:
-            context_block += "- Next deadlines:\n"
-            for e in events[:3]:
-                context_block += f"  • {e['title']} — {e['deadline']}\n"
-
-    pdf_block = ""
-    if user_context and user_context.get("pdf_content"):
-        pdf_block = f"\n\nThe user has uploaded a document called \"{user_context.get('pdf_filename', 'document.pdf')}\". Here is its content:\n\n{user_context['pdf_content']}\n\nThis document is available for the entire conversation. Use it to answer any question, even if the user doesn't explicitly mention the filename."
-
-    system = SEREN_SYSTEM_PROMPT + pdf_block
-    if context_block:
-        system += f"\n\n{context_block}"
-
+    system = build_system_prompt(user_context)
     messages = conversation_history + [{"role": "user", "content": user_message}]
 
     response = client.messages.create(
@@ -203,15 +213,6 @@ def stream_chat_with_seren(
     conversation_history: list,
     user_context: Optional[dict] = None
 ):
-    """
-    Generator yielding Server-Sent Events (SSE) strings.
-
-    - flashcards / quiz / visual: generated the same way as before (they're
-      structured JSON/HTML, not natural language, so streaming token-by-token
-      wouldn't make sense) — yielded as a single 'complete' event.
-    - regular text: streamed token-by-token as Claude generates it, via
-      client.messages.stream(), then a final 'done' event.
-    """
     message_type = detect_message_type(user_message)
 
     if message_type in ('flashcard', 'quiz', 'visual'):
@@ -220,24 +221,7 @@ def stream_chat_with_seren(
         yield f"data: {payload}\n\n"
         return
 
-    context_block = ""
-    if user_context:
-        name = user_context.get("name", "the student")
-        events = user_context.get("events", [])
-        context_block = f"\nCurrent user context:\n- Name: {name}\n- Upcoming deadlines: {len(events)} in the next 7 days\n"
-        if events:
-            context_block += "- Next deadlines:\n"
-            for e in events[:3]:
-                context_block += f"  • {e['title']} — {e['deadline']}\n"
-
-    pdf_block = ""
-    if user_context and user_context.get("pdf_content"):
-        pdf_block = f"\n\nThe user has uploaded a document called \"{user_context.get('pdf_filename', 'document.pdf')}\". Here is its content:\n\n{user_context['pdf_content']}\n\nThis document is available for the entire conversation. Use it to answer any question, even if the user doesn't explicitly mention the filename."
-
-    system = SEREN_SYSTEM_PROMPT + pdf_block
-    if context_block:
-        system += f"\n\n{context_block}"
-
+    system = build_system_prompt(user_context)
     messages = conversation_history + [{"role": "user", "content": user_message}]
 
     try:
@@ -250,12 +234,31 @@ def stream_chat_with_seren(
             for text in stream.text_stream:
                 payload = json.dumps({"event": "token", "text": text})
                 yield f"data: {payload}\n\n"
-    except Exception as e:
+    except Exception:
         payload = json.dumps({"event": "error", "message": "Something went wrong while generating the response."})
         yield f"data: {payload}\n\n"
         return
 
     yield f"data: {json.dumps({'event': 'done'})}\n\n"
+
+
+def generate_memory_summary(previous_summary: Optional[str], new_messages_text: str) -> str:
+    prompt = f"""
+Previous summary:
+{previous_summary or "(none yet — this is the first summary)"}
+
+New conversation excerpts since then:
+{new_messages_text}
+
+Produce the updated summary now.
+"""
+    response = client.messages.create(
+        model=MODEL,
+        max_tokens=300,
+        system=MEMORY_SUMMARY_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.content[0].text.strip()
 
 
 def get_onboarding_message(step: int, user_name: str) -> str:

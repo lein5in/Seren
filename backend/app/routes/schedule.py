@@ -12,9 +12,7 @@ router = APIRouter(
     tags=["Schedule"]
 )
 
-# ========================
-# ICS Parser Helper
-# ========================
+
 
 def parse_ics(content: str) -> List[dict]:
     """
@@ -42,10 +40,10 @@ def parse_ics(content: str) -> List[dict]:
                 current_event["summary"] = line.replace("SUMMARY:", "").strip()
 
             elif line.startswith("DTSTART") or line.startswith("DTEND"):
-                # Extract datetime — handles DTSTART, DTSTART;TZID=..., etc.
+                
                 value = line.split(":")[-1].strip()
                 try:
-                    # Format: 20241015T120000Z or 20241015
+                    
                     if "T" in value:
                         dt = datetime.strptime(value[:15], "%Y%m%dT%H%M%S")
                     else:
@@ -89,9 +87,7 @@ def detect_priority(event_type: EventType) -> Priority:
         return Priority.high
     return Priority.medium
 
-# ========================
-# Routes
-# ========================
+
 
 @router.post("/import/{user_id}", response_model=List[EventResponse])
 async def import_ics(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):

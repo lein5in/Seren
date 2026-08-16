@@ -37,7 +37,7 @@ export default function About() {
   return (
     <section id="about" className="py-24 px-[5%] bg-white" ref={sectionRef}>
 
-      {/* Header */}
+      {}
       <div className="reveal opacity-0 translate-y-8 transition-all duration-700">
         <p className="text-xs tracking-[3px] text-[#1D9E75] font-medium mb-4 uppercase">
           {t('ABOUT', 'À PROPOS')}
@@ -50,15 +50,15 @@ export default function About() {
         </h2>
       </div>
 
-      {/* Content */}
+      {}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
 
-        {/* Avatar */}
+        {}
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 w-full aspect-square rounded-3xl bg-gradient-to-br from-[#E1F5EE] to-[#9FE1CB] flex items-center justify-center text-[100px] max-w-[420px]">
           🌿
         </div>
 
-        {/* Text */}
+        {}
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 delay-200">
           {paragraphs.map((p, i) => (
             <p key={i} className="text-[16px] text-[#88877F] leading-[1.8] mb-5 font-light">
@@ -66,7 +66,7 @@ export default function About() {
             </p>
           ))}
 
-          {/* Highlight box */}
+          {}
           <div className="mt-8 border-l-4 border-[#1D9E75] pl-5 py-1">
             <p className="text-[15px] text-[#0F6E56] font-medium leading-relaxed">
               {t(
@@ -76,7 +76,7 @@ export default function About() {
             </p>
           </div>
 
-          {/* Signature */}
+          {}
           <p className="font-display text-[28px] italic text-[#0F6E56] mt-8">— Habib</p>
         </div>
       </div>

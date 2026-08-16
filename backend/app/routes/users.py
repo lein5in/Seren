@@ -1,17 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
+
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.database import get_db, UserDB
 from app.models.user import UserCreate, UserResponse, UserProfile, UserLogin, TokenResponse, UserIdentity, UserPasswordChange
 from app.auth import get_current_user_id, require_self, SECRET_KEY, ALGORITHM, TOKEN_EXPIRE_DAYS
+from app.rate_limit import rate_limit
 from passlib.context import CryptContext
 from jose import jwt
 import datetime
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-# ========================
-# Password hashing — bcrypt via passlib (replaces the old raw SHA256 hash)
-# ========================
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str) -> str:
@@ -31,12 +32,13 @@ def create_token(user_id: int, name: str, email: str) -> str:
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
-# ========================
-# Public routes — no auth required (that's the point)
-# ========================
+
 
 @router.post("/register", response_model=TokenResponse)
-def register_user(user: UserCreate, db: Session = Depends(get_db)):
+def register_user(user: UserCreate, request: Request, db: Session = Depends(get_db)):
+    
+    rate_limit(f"register:{request.client.host}", max_requests=5, window_seconds=3600)
+
     existing = db.query(UserDB).filter(UserDB.email == user.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -49,7 +51,10 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login_user(credentials: UserLogin, db: Session = Depends(get_db)):
+def login_user(credentials: UserLogin, request: Request, db: Session = Depends(get_db)):
+   
+    rate_limit(f"login:{request.client.host}", max_requests=10, window_seconds=900)
+
     user = db.query(UserDB).filter(UserDB.email == credentials.email).first()
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -57,9 +62,6 @@ def login_user(credentials: UserLogin, db: Session = Depends(get_db)):
     return TokenResponse(token=token, user_id=user.id, name=user.name, email=user.email)
 
 
-# ========================
-# Protected routes — require a valid token AND ownership of the resource
-# ========================
 
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(user_id: int, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
@@ -103,7 +105,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user_id: in
     user = db.query(UserDB).filter(UserDB.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    db.delete(user)  # cascade="all, delete-orphan" on the relationship also removes their events
+    db.delete(user)  
     db.commit()
     return {"ok": True}
 

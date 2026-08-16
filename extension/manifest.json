@@ -23,7 +23,7 @@
 ],
 
   "host_permissions": [
-    "https://seren-production-834b.up.railway.app/*"
+    "http://localhost:8000/*"
   ],
 
   "background": {

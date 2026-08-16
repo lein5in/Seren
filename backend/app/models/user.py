@@ -1,4 +1,6 @@
-from pydantic import BaseModel, EmailStr
+
+
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 from enum import Enum
 
@@ -20,6 +22,14 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
+   
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("Password must be at least 6 characters long")
+        return v
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
@@ -31,6 +41,13 @@ class UserIdentity(BaseModel):
 class UserPasswordChange(BaseModel):
     old_password: str
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_min_length(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("Password must be at least 6 characters long")
+        return v
 
 class UserProfile(BaseModel):
     anxiety_level: AnxietyLevel = AnxietyLevel.medium

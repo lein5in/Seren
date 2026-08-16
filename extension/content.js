@@ -1,14 +1,9 @@
-// ── Seren content.js ─────────────────────────────────────────────
-// Shows a floating action bar when the user selects text on any page.
-// Also bridges chrome.storage access for the Seren web app (Settings page),
-// which runs as a normal webpage and has no direct chrome.storage access.
 
 ;(function () {
-  // Guard against double-injection
+  
   if (window.__serenInjected) return
   window.__serenInjected = true
 
-  // ── Fallback default commands (used only if chrome.storage is empty) ──
   const DEFAULT_COMMANDS = [
     { id: 'seren-solve',     label: 'Solve',      prompt: 'Solve or explain the following:',                          isDefault: true, inTooltip: true },
     { id: 'seren-summarize', label: 'Summarize',  prompt: 'Summarize the following in a clear and concise way:',       isDefault: true, inTooltip: true },
@@ -16,23 +11,34 @@
     { id: 'seren-save',      label: 'Save',       prompt: 'Confirm that the following has been saved to my notes and give a brief summary:', isDefault: true, inTooltip: true },
   ]
 
-  let cachedCommands = null // refreshed on selection + kept in sync via storage.onChanged
+  let cachedCommands = null 
+  let cachedCommandsKey = null 
 
-  function loadCommands(callback) {
-    chrome.storage.local.get(['seren_commands'], (res) => {
-      const cmds = (res.seren_commands && Array.isArray(res.seren_commands) && res.seren_commands.length > 0)
-        ? res.seren_commands
-        : DEFAULT_COMMANDS
-      cachedCommands = cmds
-      callback(cmds)
+  function getCommandsKey(callback) {
+    chrome.storage.local.get(['userId'], (res) => {
+      callback(`seren_commands_${res.userId || 'guest'}`)
     })
   }
 
-  // Keep cache fresh if commands change while the tooltip might be shown
+  function loadCommands(callback) {
+    getCommandsKey((key) => {
+      cachedCommandsKey = key
+      chrome.storage.local.get([key], (res) => {
+        const cmds = (res[key] && Array.isArray(res[key]) && res[key].length > 0)
+          ? res[key]
+          : DEFAULT_COMMANDS
+        cachedCommands = cmds
+        callback(cmds)
+      })
+    })
+  }
+
+ 
   if (chrome.storage && chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes.seren_commands) {
-        cachedCommands = changes.seren_commands.newValue || DEFAULT_COMMANDS
+      if (area !== 'local') return
+      if (cachedCommandsKey && changes[cachedCommandsKey]) {
+        cachedCommands = changes[cachedCommandsKey].newValue || DEFAULT_COMMANDS
       }
     })
   }
@@ -41,7 +47,6 @@
   let toast = null
   let hideTooltipTimer = null
 
-  // ── Styles ────────────────────────────────────────────────────
 
   const style = document.createElement('style')
   style.textContent = `
@@ -146,7 +151,7 @@
   `
   document.head.appendChild(style)
 
-  // ── Tooltip ───────────────────────────────────────────────────
+ 
 
   function removeTooltip() {
     if (tooltip) { tooltip.remove(); tooltip = null }
@@ -220,7 +225,7 @@
     })
   }
 
-  // ── Toast ─────────────────────────────────────────────────────
+
 
   function showToast() {
     removeToast()
@@ -231,9 +236,7 @@
     setTimeout(removeToast, 3500)
   }
 
-  // ── Handle action ─────────────────────────────────────────────
-  // cmd = { id, label, prompt }, text = selected text
-
+ 
   function handleAction(cmd, text) {
     const fullPrompt = `${cmd.prompt}\n\n${text}`
     chrome.runtime.sendMessage({
@@ -243,7 +246,7 @@
     }, () => { showToast() })
   }
 
-  // ── Selection detection ───────────────────────────────────────
+ 
 
   document.addEventListener('mouseup', (e) => {
     if (tooltip && tooltip.contains(e.target)) return
@@ -267,11 +270,8 @@
   document.addEventListener('scroll', () => removeTooltip(), { passive: true })
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') removeTooltip() })
 
-  // ── Auth sync bridge ──────────────────────────────────────────
-  // Runs once on page load. If the user is logged in on the Seren
-  // website (localhost:5173), their token is in localStorage.
-  // We forward it to background.js → stored in chrome.storage
-  // → popup reads the real name instead of "there".
+ 
+
 
   function syncAuth() {
     try {
@@ -290,23 +290,13 @@
         email:  user.email || ''
       })
     } catch (err) {
-      // localStorage unavailable on some pages — silently ignore
+      
     }
   }
 
   syncAuth()
 
-  // ── Storage bridge for the Seren web app ───────────────────────
-  // Settings.tsx (a normal webpage on localhost:5173) can't access
-  // chrome.storage directly. It posts messages to window, we relay
-  // them to chrome.storage here (content scripts have access) and
-  // post the result back.
-  //
-  // Request:  { source: 'seren-web', type: 'SEREN_STORAGE_GET', key, requestId }
-  // Response: { source: 'seren-extension', type: 'SEREN_STORAGE_RESULT', requestId, value }
-  //
-  // Request:  { source: 'seren-web', type: 'SEREN_STORAGE_SET', key, value, requestId }
-  // Response: { source: 'seren-extension', type: 'SEREN_STORAGE_RESULT', requestId, ok: true }
+ 
 
   window.addEventListener('message', (event) => {
     if (event.source !== window) return
@@ -336,8 +326,7 @@
     }
   })
 
-  // Let the web page know the extension is present (so it doesn't
-  // need to time out before falling back to localStorage).
+  
   window.postMessage({ source: 'seren-extension', type: 'SEREN_BRIDGE_READY' }, '*')
 
 })()

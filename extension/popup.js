@@ -1,4 +1,5 @@
-const API_BASE = "https://seren-production-834b.up.railway.app";
+const API_BASE = "http://localhost:8000";
+const WEB_APP_BASE = "http://localhost:5174";
 
 const ACTION_PROMPTS = {
   'seren-solve':     (text) => `Solve or explain the following:\n\n${text}`,
@@ -11,8 +12,26 @@ const ACTION_PROMPTS = {
 
 const isTabMode = window.innerWidth >= 600
 
-// ── Pending file upload state ─────────────────────────────────────
-let pendingUploadedFile = null // { filename, characters, userId }
+let pendingUploadedFile = null
+let activeConversationId = null
+
+function storageGet(keys) {
+  return new Promise(resolve => chrome.storage.local.get(keys, resolve))
+}
+
+function storageSet(obj) {
+  return new Promise(resolve => chrome.storage.local.set(obj, resolve))
+}
+
+async function getSession() {
+  const res = await storageGet(['userId', 'serenToken'])
+  if (!res.userId || !res.serenToken) return null
+  return { userId: res.userId, token: res.serenToken }
+}
+
+function activeConversationKey(userId) {
+  return `seren_active_conversation_${userId}`
+}
 
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
@@ -159,8 +178,6 @@ function loadOverwhelmTask(events) {
   })
 }
 
-// ── Input file chip ───────────────────────────────────────────────
-
 function showInputFileChip(filename) {
   removeInputFileChip()
   const chatFooter = document.querySelector('.chat-footer')
@@ -187,8 +204,6 @@ function removeInputFileChip() {
   document.getElementById('input-file-chip')?.remove()
 }
 
-// ── Chat messages ─────────────────────────────────────────────────
-
 function exportMessageAsPDF(text) {
   const { jsPDF } = window.jspdf
   const doc = new jsPDF()
@@ -209,7 +224,7 @@ function appendMessage(role, text) {
   const div = document.createElement('div')
   div.className = `message ${role}`
   if (role === 'seren') {
-    div.innerHTML = marked.parse(text)
+    div.innerHTML = DOMPurify.sanitize(marked.parse(text))
     div.querySelectorAll('pre code').forEach(block => {
       if (typeof hljs !== 'undefined') hljs.highlightElement(block)
     })
@@ -221,11 +236,10 @@ function appendMessage(role, text) {
       div.appendChild(exportBtn)
     }
   } else {
-    div.innerHTML = `<p>${text}</p>`
+    div.innerHTML = DOMPurify.sanitize(`<p>${text}</p>`)
   }
   container.appendChild(div)
   container.scrollTop = container.scrollHeight
-  saveHistory()
 }
 
 function appendLoading() {
@@ -243,35 +257,6 @@ function removeLoading() {
   if (el) el.remove()
 }
 
-function saveHistory() {
-  const messages = []
-  document.querySelectorAll('#chat-messages .message').forEach(div => {
-    if (div.classList.contains('loading')) return
-    messages.push({
-      role: div.classList.contains('user') ? 'user' : 'seren',
-      html: div.innerHTML
-    })
-  })
-  chrome.storage.local.set({ chatHistory: messages })
-}
-
-function restoreHistory() {
-  chrome.storage.local.get(['chatHistory'], (res) => {
-    if (!res.chatHistory || res.chatHistory.length === 0) return
-    const container = document.getElementById('chat-messages')
-    container.innerHTML = ''
-    res.chatHistory.forEach(msg => {
-      const div = document.createElement('div')
-      div.className = `message ${msg.role}`
-      div.innerHTML = msg.html
-      container.appendChild(div)
-    })
-    container.scrollTop = container.scrollHeight
-  })
-}
-
-// ── Flashcards ────────────────────────────────────────────────────
-
 function appendFlashcards(data) {
   const container = document.getElementById('chat-messages')
   const cards = data.cards || []
@@ -288,11 +273,11 @@ function appendFlashcards(data) {
     <div class="flashcard-scene">
       <div class="flashcard" id="fc-card">
         <div class="flashcard-front">
-          <p>${cards[0].front}</p>
+          <p>${cards[0]?.front || ''}</p>
           <span class="flashcard-hint">Tap to flip</span>
         </div>
         <div class="flashcard-back">
-          <p>${cards[0].back}</p>
+          <p>${cards[0]?.back || ''}</p>
         </div>
       </div>
     </div>
@@ -322,8 +307,6 @@ function appendFlashcards(data) {
   wrapper.querySelector('#fc-prev').addEventListener('click', () => { if (currentIndex > 0) { currentIndex--; updateCard() } })
   wrapper.querySelector('#fc-next').addEventListener('click', () => { if (currentIndex < cards.length - 1) { currentIndex++; updateCard() } })
 }
-
-// ── Quiz ──────────────────────────────────────────────────────────
 
 function appendQuiz(data) {
   const container = document.getElementById('chat-messages')
@@ -399,8 +382,6 @@ function appendQuiz(data) {
   container.scrollTop = container.scrollHeight
 }
 
-// ── Visual ────────────────────────────────────────────────────────
-
 function appendVisual(html) {
   const container = document.getElementById('chat-messages')
   const wrapper = document.createElement('div')
@@ -429,30 +410,30 @@ function appendVisual(html) {
 
   container.appendChild(wrapper)
   container.scrollTop = container.scrollHeight
-  saveHistory()
 }
-
-// ── Custom commands (synced via chrome.storage with Settings page) ─
 
 function loadSidebarCommands() {
   const container = document.getElementById('sidebar-commands-list')
   if (!container) return
-  chrome.storage.local.get(['seren_commands'], (res) => {
-    const commands = Array.isArray(res.seren_commands) ? res.seren_commands : []
-    if (commands.length === 0) {
-      container.innerHTML = ''
-      return
-    }
-    container.innerHTML = commands.map(cmd => `
-      <button class="sidebar-quick-item" data-command-id="${cmd.id}">
-        <span style="color:#5DCAA5;font-weight:700;font-size:11px;">/</span>
-        ${cmd.label}
-      </button>
-    `).join('')
-    container.querySelectorAll('[data-command-id]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const cmd = commands.find(c => c.id === btn.dataset.commandId)
-        if (cmd) pasteIntoInput(cmd.prompt + ' ')
+  storageGet(['userId']).then((res) => {
+    const key = `seren_commands_${res.userId || 'guest'}`
+    chrome.storage.local.get([key], (res2) => {
+      const commands = Array.isArray(res2[key]) ? res2[key] : []
+      if (commands.length === 0) {
+        container.innerHTML = ''
+        return
+      }
+      container.innerHTML = commands.map(cmd => `
+        <button class="sidebar-quick-item" data-command-id="${cmd.id}">
+          <span style="color:#5DCAA5;font-weight:700;font-size:11px;">/</span>
+          ${cmd.label}
+        </button>
+      `).join('')
+      container.querySelectorAll('[data-command-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const cmd = commands.find(c => c.id === btn.dataset.commandId)
+          if (cmd) pasteIntoInput(cmd.prompt + ' ')
+        })
       })
     })
   })
@@ -460,11 +441,35 @@ function loadSidebarCommands() {
 
 if (chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.seren_commands) loadSidebarCommands()
+    if (area !== 'local') return
+    const changedKey = Object.keys(changes).find(k => k.startsWith('seren_commands_'))
+    if (changedKey) loadSidebarCommands()
   })
 }
 
-// ── Paste into input ──────────────────────────────────────────────
+function applyDarkMode(enabled) {
+  document.body.classList.toggle('dark', enabled)
+  const sunIcon = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`
+  const moonIcon = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`
+  const icon = document.getElementById('dark-toggle-icon')
+  const iconSidebar = document.getElementById('dark-toggle-icon-sidebar')
+  const label = document.getElementById('dark-toggle-label-sidebar')
+  if (icon) icon.innerHTML = enabled ? moonIcon : sunIcon
+  if (iconSidebar) iconSidebar.innerHTML = enabled ? moonIcon : sunIcon
+  if (label) label.textContent = enabled ? 'Light mode' : 'Dark mode'
+}
+
+async function toggleDarkMode() {
+  const res = await storageGet(['seren_ext_dark'])
+  const next = !res.seren_ext_dark
+  await storageSet({ seren_ext_dark: next })
+  applyDarkMode(next)
+}
+
+async function initDarkMode() {
+  const res = await storageGet(['seren_ext_dark'])
+  applyDarkMode(!!res.seren_ext_dark)
+}
 
 function pasteIntoInput(text) {
   const input = document.getElementById('chat-input')
@@ -476,12 +481,185 @@ function pasteIntoInput(text) {
   input.setSelectionRange(text.length, text.length)
 }
 
-// ── Send to Seren (streamed via SSE) ────────────────────────────────
+function showLoginRequired() {
+  const container = document.getElementById('chat-messages')
+  container.innerHTML = `
+    <div class="message seren">
+      <p>Please log in on the Seren website first, then reopen this popup.</p>
+    </div>
+  `
+}
+
+function renderMessageFromApi(msg) {
+  if (msg.type === 'flashcards' && msg.data) {
+    appendFlashcards(msg.data)
+  } else if (msg.type === 'quiz' && msg.data) {
+    appendQuiz(msg.data)
+  } else if (msg.type === 'visual' && msg.data) {
+    appendVisual(msg.data)
+  } else {
+    appendMessage(msg.role === 'assistant' ? 'seren' : 'user', msg.content || '')
+  }
+}
+
+function formatConversationDate(iso) {
+  const date = new Date(iso)
+  const now = new Date()
+  const days = Math.floor((now - date) / (1000 * 60 * 60 * 24))
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days}d`
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+async function loadSidebarConversations(session) {
+  const container = document.getElementById('sidebar-conversations-list')
+  if (!container) return
+  try {
+    const res = await fetch(`${API_BASE}/conversations/`, {
+      headers: { Authorization: `Bearer ${session.token}` }
+    })
+    if (!res.ok) throw new Error()
+    const conversations = await res.json()
+    container.innerHTML = conversations.map(conv => `
+      <div class="sidebar-quick-item" data-conv-id="${conv.id}" style="justify-content:space-between;padding-right:6px;${conv.id === activeConversationId ? 'background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.9);' : ''}">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${conv.title}</span>
+        <span style="font-size:9px;opacity:0.4;flex-shrink:0;margin-left:6px;">${formatConversationDate(conv.updated_at)}</span>
+        <button class="conv-delete-btn" data-conv-id="${conv.id}" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.25);padding:0 0 0 6px;flex-shrink:0;display:flex;align-items:center;">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+          </svg>
+        </button>
+      </div>
+    `).join('')
+    container.querySelectorAll('[data-conv-id]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.conv-delete-btn')) return
+        const id = parseInt(el.dataset.convId)
+        switchConversation(session, id)
+      })
+    })
+    container.querySelectorAll('.conv-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation()
+        const id = parseInt(btn.dataset.convId)
+        await deleteConversationFromSidebar(session, id)
+      })
+    })
+  } catch {}
+}
+
+async function switchConversation(session, conversationId) {
+  activeConversationId = conversationId
+  await storageSet({ [activeConversationKey(session.userId)]: conversationId })
+  await loadConversationMessages(session, conversationId)
+  loadSidebarConversations(session)
+}
+
+async function deleteConversationFromSidebar(session, conversationId) {
+  try {
+    await fetch(`${API_BASE}/conversations/${conversationId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session.token}` }
+    })
+  } catch {}
+  if (conversationId === activeConversationId) {
+    try {
+      activeConversationId = await ensureActiveConversation(session)
+      await loadConversationMessages(session, activeConversationId)
+    } catch {}
+  }
+  loadSidebarConversations(session)
+}
+
+async function ensureActiveConversation(session) {
+  const key = activeConversationKey(session.userId)
+  const stored = await storageGet([key])
+  const storedId = stored[key]
+
+  const listRes = await fetch(`${API_BASE}/conversations/`, {
+    headers: { Authorization: `Bearer ${session.token}` }
+  })
+  if (!listRes.ok) throw new Error('conversations_list_failed')
+  const conversations = await listRes.json()
+
+  if (storedId && conversations.some(c => c.id === storedId)) {
+    return storedId
+  }
+
+  if (conversations.length > 0) {
+    await storageSet({ [key]: conversations[0].id })
+    return conversations[0].id
+  }
+
+  const createRes = await fetch(`${API_BASE}/conversations/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` },
+    body: JSON.stringify({ title: 'New conversation' })
+  })
+  if (!createRes.ok) throw new Error('conversation_create_failed')
+  const created = await createRes.json()
+  await storageSet({ [key]: created.id })
+  return created.id
+}
+
+async function loadConversationMessages(session, conversationId) {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}`, {
+    headers: { Authorization: `Bearer ${session.token}` }
+  })
+  if (!res.ok) throw new Error('conversation_load_failed')
+  const data = await res.json()
+  const container = document.getElementById('chat-messages')
+  container.innerHTML = ''
+  const messages = data.messages || []
+  if (messages.length === 0) {
+    container.innerHTML = `<div class="message seren"><p>Hi! What do you want to work on today?</p></div>`
+    return
+  }
+  messages.forEach(renderMessageFromApi)
+  container.scrollTop = container.scrollHeight
+}
+
+async function initConversation() {
+  const session = await getSession()
+  if (!session) {
+    showLoginRequired()
+    return
+  }
+  try {
+    activeConversationId = await ensureActiveConversation(session)
+    await loadConversationMessages(session, activeConversationId)
+    loadSidebarConversations(session)
+  } catch {
+    appendMessage('seren', 'Could not load your conversation. Is the backend running?')
+  }
+}
+
+async function startNewConversation() {
+  const session = await getSession()
+  if (!session) { showLoginRequired(); return }
+  try {
+    const createRes = await fetch(`${API_BASE}/conversations/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` },
+      body: JSON.stringify({ title: 'New conversation' })
+    })
+    if (!createRes.ok) throw new Error()
+    const created = await createRes.json()
+    activeConversationId = created.id
+    await storageSet({ [activeConversationKey(session.userId)]: created.id })
+    document.getElementById('chat-messages').innerHTML = `<div class="message seren"><p>What do you want to work on?</p></div>`
+    removeInputFileChip()
+    pendingUploadedFile = null
+    loadSidebarConversations(session)
+  } catch {
+    appendMessage('seren', 'Could not start a new conversation. Is the backend running?')
+  }
+}
 
 let activeStreamController = null
 
 function setSendButtonMode(mode) {
-  // mode: 'send' | 'stop'
   const btn = document.getElementById('btn-send')
   if (!btn) return
   btn.dataset.mode = mode
@@ -504,7 +682,7 @@ function appendStreamingMessage() {
   return {
     el: div,
     update(text) {
-      div.innerHTML = marked.parse(text)
+      div.innerHTML = DOMPurify.sanitize(marked.parse(text))
       div.querySelectorAll('pre code').forEach(block => {
         if (typeof hljs !== 'undefined') hljs.highlightElement(block)
       })
@@ -518,102 +696,110 @@ function appendStreamingMessage() {
         exportBtn.addEventListener('click', () => exportMessageAsPDF(text))
         div.appendChild(exportBtn)
       }
-      saveHistory()
     }
   }
 }
 
 async function sendToSeren(userText) {
   if (isTabMode) { showPanel('chat') } else { showView('view-chat') }
+
+  const session = await getSession()
+  if (!session) { showLoginRequired(); return }
+  if (!activeConversationId) {
+    try {
+      activeConversationId = await ensureActiveConversation(session)
+    } catch {
+      appendMessage('seren', 'Could not reach Seren. Is the backend running?')
+      return
+    }
+  }
+
   appendMessage('user', userText)
   appendLoading()
 
-  chrome.storage.local.get(['userId', 'serenToken'], async (res) => {
-    const controller = new AbortController()
-    activeStreamController = controller
-    setSendButtonMode('stop')
+  const controller = new AbortController()
+  activeStreamController = controller
+  setSendButtonMode('stop')
 
-    let stream = null
-    let accumulated = ''
+  let stream = null
+  let accumulated = ''
 
-    try {
-      const response = await fetch(`${API_BASE}/ai/chat/stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(res.serenToken ? { Authorization: `Bearer ${res.serenToken}` } : {})
-        },
-        body: JSON.stringify({ message: userText, user_id: res.userId || 1 }),
-        signal: controller.signal
-      })
+  try {
+    const response = await fetch(`${API_BASE}/ai/chat/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.token}`
+      },
+      body: JSON.stringify({ conversation_id: activeConversationId, message: userText }),
+      signal: controller.signal
+    })
 
-      if (!response.ok || !response.body) {
-        removeLoading()
-        if (response.status === 429) {
-          appendMessage('seren', "You're sending messages a bit too fast — wait a few seconds and try again.")
-        } else if (response.status === 401 || response.status === 403) {
-          appendMessage('seren', 'Your session expired. Please log out and log back in from Settings.')
-        } else {
-          appendMessage('seren', 'Could not reach Seren. Is the backend running?')
-        }
-        setSendButtonMode('send')
-        activeStreamController = null
-        return
-      }
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let handledStructured = false
-
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const events = buffer.split('\n\n')
-        buffer = events.pop() || ''
-
-        for (const raw of events) {
-          if (!raw.startsWith('data: ')) continue
-          const json = JSON.parse(raw.slice(6))
-
-          if (json.event === 'token') {
-            if (!stream) { removeLoading(); stream = appendStreamingMessage() }
-            accumulated += json.text
-            stream.update(accumulated)
-          } else if (json.event === 'complete') {
-            removeLoading()
-            handledStructured = true
-            if (json.type === 'flashcards') appendFlashcards(json.data)
-            else if (json.type === 'quiz') appendQuiz(json.data)
-            else if (json.type === 'visual') appendVisual(json.data)
-          } else if (json.event === 'error') {
-            removeLoading()
-            appendMessage('seren', json.message || 'Something went wrong.')
-          }
-        }
-      }
-
-      if (stream && !handledStructured) stream.finalize(accumulated)
-    } catch (err) {
+    if (!response.ok || !response.body) {
       removeLoading()
-      if (err?.name !== 'AbortError') {
+      if (response.status === 429) {
+        appendMessage('seren', "You're sending messages a bit too fast — wait a few seconds and try again.")
+      } else if (response.status === 401 || response.status === 403) {
+        appendMessage('seren', 'Your session expired. Please log out and log back in from Settings.')
+      } else {
         appendMessage('seren', 'Could not reach Seren. Is the backend running?')
-      } else if (stream && accumulated) {
-        stream.finalize(accumulated)
       }
-    } finally {
       setSendButtonMode('send')
       activeStreamController = null
+      return
     }
-  })
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let handledStructured = false
+
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const events = buffer.split('\n\n')
+      buffer = events.pop() || ''
+
+      for (const raw of events) {
+        if (!raw.startsWith('data: ')) continue
+        const json = JSON.parse(raw.slice(6))
+
+        if (json.event === 'token') {
+          if (!stream) { removeLoading(); stream = appendStreamingMessage() }
+          accumulated += json.text
+          stream.update(accumulated)
+        } else if (json.event === 'complete') {
+          removeLoading()
+          handledStructured = true
+          if (json.type === 'flashcards') appendFlashcards(json.data)
+          else if (json.type === 'quiz') appendQuiz(json.data)
+          else if (json.type === 'visual') appendVisual(json.data)
+        } else if (json.event === 'error') {
+          removeLoading()
+          appendMessage('seren', json.message || 'Something went wrong.')
+        }
+      }
+    }
+
+    if (stream && !handledStructured) stream.finalize(accumulated)
+  } catch (err) {
+    removeLoading()
+    if (err?.name !== 'AbortError') {
+      appendMessage('seren', 'Could not reach Seren. Is the backend running?')
+    } else if (stream && accumulated) {
+      stream.finalize(accumulated)
+    }
+  } finally {
+    setSendButtonMode('send')
+    activeStreamController = null
+    loadSidebarConversations(session)
+  }
 }
 
 function stopSerenGeneration() {
   activeStreamController?.abort()
 }
-
-// ── Focus timer ───────────────────────────────────────────────────
 
 let focusInterval = null
 let focusSeconds = 25 * 60
@@ -629,16 +815,12 @@ function updateTimerDisplay() {
   }
 }
 
-// ── checkPendingAction → paste into input instead of auto-send ────
-
 function checkPendingAction() {
   chrome.storage.local.get(['pendingQuery', 'pendingAction', 'pendingPromptText'], (res) => {
     if (res.pendingPromptText) {
-      // New format: content.js already built the full prompt from the user's command
       chrome.storage.local.remove(['pendingQuery', 'pendingAction', 'pendingPromptText'])
       pasteIntoInput(res.pendingPromptText)
     } else if (res.pendingQuery && res.pendingAction) {
-      // Legacy format fallback (context menu still uses this)
       const prompt = ACTION_PROMPTS[res.pendingAction]
         ? ACTION_PROMPTS[res.pendingAction](res.pendingQuery)
         : res.pendingQuery
@@ -648,22 +830,27 @@ function checkPendingAction() {
   })
 }
 
-// ── Init ──────────────────────────────────────────────────────────
-
 document.addEventListener('DOMContentLoaded', () => {
   loadGreeting()
   loadDeadlines()
   loadSidebarCommands()
-  restoreHistory()
+  initConversation()
   checkPendingAction()
+  initDarkMode()
 
   if (isTabMode) showPanel('chat')
+
+  document.getElementById('btn-dark-toggle')?.addEventListener('click', toggleDarkMode)
+  document.getElementById('btn-dark-toggle-sidebar')?.addEventListener('click', toggleDarkMode)
+
+  document.getElementById('sidebar-new-chat')?.addEventListener('click', () => {
+    startNewConversation()
+  })
 
   document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
     btn.addEventListener('click', () => showPanel(btn.dataset.panel))
   })
 
-  // Quick actions → paste into input
   document.querySelectorAll('.sidebar-quick-item').forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action
@@ -679,7 +866,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-back-focus')?.addEventListener('click', () => showView('view-home'))
   document.getElementById('btn-back-overwhelm')?.addEventListener('click', () => showView('view-home'))
 
-  // Quick buttons → paste into input
   document.querySelectorAll('.quick-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action
@@ -695,6 +881,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })
 
+  document.getElementById('btn-new-chat')?.addEventListener('click', () => {
+    startNewConversation()
+  })
+
   document.getElementById('btn-send')?.addEventListener('click', () => {
     const btn = document.getElementById('btn-send')
     if (btn.dataset.mode === 'stop') {
@@ -705,7 +895,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const text = input.value.trim()
     if (!text) return
     input.value = ''
-    // If there's a pending uploaded file, include it in context
     if (pendingUploadedFile) {
       removeInputFileChip()
       pendingUploadedFile = null
@@ -722,49 +911,47 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!file) return
     e.target.value = ''
 
-    chrome.storage.local.get(['userId', 'serenToken'], async (res) => {
-      if (!res.userId || !res.serenToken) {
-        appendMessage('seren', 'Please log in to upload documents.')
-        return
+    const session = await getSession()
+    if (!session) { showLoginRequired(); return }
+    if (!activeConversationId) {
+      try { activeConversationId = await ensureActiveConversation(session) }
+      catch { appendMessage('seren', 'Could not reach Seren. Is the backend running?'); return }
+    }
+
+    if (isTabMode) showPanel('chat')
+    else showView('view-chat')
+
+    appendLoading()
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const response = await fetch(`${API_BASE}/upload/pdf/${activeConversationId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.token}` },
+        body: formData
+      })
+      const data = await response.json()
+      removeLoading()
+      if (response.ok) {
+        pendingUploadedFile = { filename: data.filename, characters: data.characters }
+        showInputFileChip(data.filename)
+        appendMessage('seren', `I've read **${data.filename}** (${data.characters.toLocaleString()} characters). What would you like to do with it?`)
+        pasteIntoInput(`I've uploaded "${data.filename}". `)
+      } else {
+        appendMessage('seren', `Couldn't read that PDF: ${data.detail}`)
       }
-      if (isTabMode) showPanel('chat')
-      else showView('view-chat')
-
-      appendLoading()
-
-      const formData = new FormData()
-      formData.append('file', file)
-
-      try {
-        const response = await fetch(`${API_BASE}/upload/pdf/${res.userId}`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${res.serenToken}` },
-          body: formData
-        })
-        const data = await response.json()
-        removeLoading()
-        if (response.ok) {
-          pendingUploadedFile = { filename: data.filename, characters: data.characters }
-          // Show chip in input bar
-          showInputFileChip(data.filename)
-          // Confirm in chat
-          appendMessage('seren', `I've read **${data.filename}** (${data.characters.toLocaleString()} characters). What would you like to do with it?`)
-          // Pre-fill input so user can add their question
-          pasteIntoInput(`I've uploaded "${data.filename}". `)
-        } else {
-          appendMessage('seren', `Couldn't read that PDF: ${data.detail}`)
-        }
-      } catch {
-        removeLoading()
-        appendMessage('seren', 'Upload failed. Is the backend running?')
-      }
-    })
+    } catch {
+      removeLoading()
+      appendMessage('seren', 'Upload failed. Is the backend running?')
+    }
   })
 
   document.getElementById('chat-input')?.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return
     const btn = document.getElementById('btn-send')
-    if (btn.dataset.mode === 'stop') return // ignore Enter while generating, don't accidentally stop
+    if (btn.dataset.mode === 'stop') return
     btn.click()
   })
 
@@ -788,10 +975,10 @@ document.addEventListener('DOMContentLoaded', () => {
   })
 
   document.getElementById('btn-settings')?.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://seren-blond.vercel.app/settings' })
+    chrome.tabs.create({ url: `${WEB_APP_BASE}/settings` })
   })
 
   document.getElementById('btn-settings-sidebar')?.addEventListener('click', () => {
-  chrome.tabs.create({ url: 'https://seren-blond.vercel.app/settings' })
+    chrome.tabs.create({ url: `${WEB_APP_BASE}/settings` })
   })
 })

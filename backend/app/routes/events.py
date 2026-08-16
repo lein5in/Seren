@@ -20,9 +20,7 @@ def get_owned_event(event_id: int, current_user_id: int, db: Session) -> EventDB
         raise HTTPException(status_code=403, detail="Not authorized to access this event")
     return event
 
-# ========================
-# Routes
-# ========================
+
 
 @router.post("/", response_model=EventResponse)
 def create_event(event: EventCreate, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):

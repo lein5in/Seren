@@ -17,12 +17,12 @@ export default function Hero() {
   return (
     <section className="min-h-screen pt-[120px] pb-20 px-[5%] grid grid-cols-1 lg:grid-cols-2 items-center gap-16 relative overflow-hidden">
 
-      {/* Background glow */}
+      {}
       <div className="absolute top-[-100px] right-[-100px] w-[600px] h-[600px] rounded-full pointer-events-none opacity-60"
         style={{ background: 'radial-gradient(circle, #E1F5EE 0%, transparent 70%)' }}
       />
 
-      {/* Left — Content */}
+      {}
       <div className="relative z-10">
         <div className="inline-flex items-center gap-2 bg-[#E1F5EE] border border-[#9FE1CB] rounded-full px-4 py-1.5 text-xs text-[#0F6E56] tracking-widest font-medium mb-7">
           <span className="w-1.5 h-1.5 rounded-full bg-[#1D9E75] animate-pulse" />
@@ -61,10 +61,10 @@ export default function Hero() {
         </p>
       </div>
 
-      {/* Right — Silver MacBook mockup */}
+      {}
       <div className="relative h-[520px] flex items-center justify-center">
 
-        {/* Floating cards */}
+        {}
         {[
           { label: t('Right-click any text', 'Clic droit sur n\'importe quel texte'), value: '→ Solve with Seren', pos: 'top-8 left-0', anim: 'animate-float-a' },
           { label: t('Focus session', 'Session focus'), value: '🎯 45 min deep work', pos: 'bottom-16 left-0', anim: 'animate-float-b' },
@@ -77,10 +77,10 @@ export default function Hero() {
           </div>
         ))}
 
-        {/* Laptop wrapper */}
+        {}
         <div className="relative w-[420px] z-10">
 
-          {/* Screen lid */}
+          {}
           <div
             className="relative w-full rounded-t-[16px] overflow-hidden"
             style={{
@@ -98,7 +98,7 @@ export default function Hero() {
             >
               <div className="w-full h-full bg-white relative overflow-hidden" style={{ borderRadius: '4px 4px 0 0' }}>
 
-                {/* Browser bar */}
+                {}
                 <div className="bg-[#F2F2F2] px-3 py-2 flex items-center gap-2 border-b border-[#E0E0E0]">
                   <div className="flex gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#FF5F57]" />
@@ -114,7 +114,7 @@ export default function Hero() {
                   </div>
                 </div>
 
-                {/* Page content */}
+                {}
                 <div className="px-6 pt-4 pb-2 opacity-80">
                   <p className="text-[7px] text-[#aaa] uppercase tracking-widest mb-1">CSI2110 — Week 6</p>
                   <p className="text-[12px] font-semibold text-[#1a1a1a] mb-3">Binary Search Trees</p>
@@ -132,7 +132,7 @@ export default function Hero() {
                   </p>
                 </div>
 
-                {/* Seren popup */}
+                {}
                 <div
                   className="absolute right-3 top-[36px] w-[148px] bg-white overflow-hidden"
                   style={{ borderRadius: '12px', boxShadow: '0 8px 40px rgba(0,0,0,0.14), 0 0 0 0.5px rgba(15,110,86,0.25)' }}
@@ -181,10 +181,10 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* Hinge */}
+          {}
           <div style={{ height: '4px', background: 'linear-gradient(to bottom, #b8b8b8, #c8c8c8)', boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }} />
 
-          {/* Base */}
+          {}
           <div style={{
             background: 'linear-gradient(160deg, #e0e0e0 0%, #cacaca 50%, #c0c0c0 100%)',
             height: '20px', borderRadius: '0 0 6px 6px',
@@ -197,7 +197,7 @@ export default function Hero() {
             }} />
           </div>
 
-          {/* Desk shadow */}
+          {}
           <div style={{
             height: '8px',
             background: 'linear-gradient(to bottom, rgba(0,0,0,0.06), transparent)',
